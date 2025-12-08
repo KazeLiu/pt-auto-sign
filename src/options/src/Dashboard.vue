@@ -29,34 +29,66 @@
     </el-card>
   </div>
 </template>
+
 <script setup>
-import {siteList} from "../constant/site.js";
-import {onMounted, ref} from "vue";
-import {handleSignTask} from "../utils/signIn/index.js";
-import {addSignDate} from "../utils/storage/signDate.js";
-import {storage} from '../utils/storage';
+import { siteList } from "../constant/site.js";
+import { onMounted, reactive, toRefs } from "vue";
+import { handleSignTask } from "../utils/signIn/index.js";
+import { addSignDate } from "../utils/storage/signDate.js";
+import { storage } from '../utils/storage';
 
-const recordMap = ref({}); // 签到记录表
-const tableData = ref([]);
+// 核心状态管理
+const state = reactive({
+  recordMap: {}, // 签到记录字典
+  tableData: []  // 表格展示数据
+});
 
+// 使用 toRefs 保持模板中的引用不变 (recordMap, tableData)
+const { recordMap, tableData } = toRefs(state);
+
+
+// 🌸 2. 数据初始化与加载
+// 从 Storage 加载记录并转换为 Map
 async function fetchRecords() {
   const rawRecords = await storage.get('site_sign_records', []);
   const map = {};
   rawRecords.forEach(item => {
     map[item.key] = item.dates;
   });
-  recordMap.value = map; // 核心：更新响应式数据
+  state.recordMap = map; // 更新状态
 }
 
+// 页面初始化入口
+async function initData() {
+  state.tableData = siteList; // 加载静态站点配置
+  await fetchRecords();       // 加载动态签到记录
+}
+
+// 记录首次使用时间
+async function saveOnceUseTime() {
+  const firstUseDate = await storage.get('first_use_date');
+  if (!firstUseDate) {
+    const now = new Date().toLocaleString();
+    await storage.set('first_use_date', now);
+    console.log('🎉 欢迎新用户！首次使用时间已记录:', now);
+  } else {
+    console.log('🍵 这是一个老用户，首次使用于:', firstUseDate);
+  }
+}
+
+
+// 核心业务逻辑
+// 单个站点签到
 async function sign(site) {
   let result = await handleSignTask(site);
   if (result.sign) {
     const today = new Date().toISOString().split('T')[0];
     await addSignDate(site.name, today);
-    await fetchRecords();
+    await fetchRecords(); // 刷新记录
   }
 }
 
+// 一键全部签到
 async function allSign() {
   for (const site of siteList) {
     let result = await handleSignTask(site);
@@ -65,33 +97,25 @@ async function allSign() {
       await addSignDate(site.name, today);
     }
   }
-  await fetchRecords();
-}
-async function init() {
-  tableData.value = siteList;
-  const rawRecords = await storage.get('site_sign_records', []);
-  const map = {};
-  rawRecords.forEach(item => {
-    map[item.key] = item.dates;
-  });
-  recordMap.value = map;
+  await fetchRecords(); // 全部完成后刷新
 }
 
-// 判断站点xx日有没有签到
-const checkIsSignedToday = (siteName, dayStr = new Date().toISOString().split('T')[0]) => {
-  const dates = recordMap.value[siteName];
-  if (dates && dates.includes(dayStr)) {
-    return true;
-  }
-  return false;
+
+// 辅助工具方法
+// 检查某站点今日是否已签到
+const checkIsSignedToday = (siteName) => {
+  const dayStr = new Date().toISOString().split('T')[0];
+  const dates = state.recordMap[siteName];
+  return dates && dates.includes(dayStr);
 };
 
-onMounted(async () => {
-  await init();
-  await fetchRecords();
-})
-</script>
 
+// 🌸 5. 生命周期 (Lifecycle)
+onMounted(async () => {
+  await saveOnceUseTime();
+  await initData();
+});
+</script>
 
 <style scoped>
 .page-content {

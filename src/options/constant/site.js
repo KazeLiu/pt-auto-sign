@@ -1,11 +1,12 @@
 export const siteList = [
     {
         // 图片识别 看有没有免费的
-        name: '动漫花园',
+        name: '动漫花园(暂时未实现正确选择)',
         site: "https://u2.dmhy.org",
         siteType: 'U2',
         targetUrl: "https://u2.dmhy.org/showup.php"
-    }, {
+    },
+    {
         // 一次性按钮 不跳转页面 签到信息刷新后消失再也不见 刷新页面不再显示签到获得数字
         name: '海胆',
         site: "https://www.haidan.video/",

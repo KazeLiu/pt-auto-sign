@@ -6,7 +6,8 @@
         <el-button @click="allSign">一键全部签到</el-button>
       </div>
       <div class="stats">
-        <el-table :data="tableData">
+        <el-table :data="tableData" ref="tableRef">
+          <el-table-column type="selection" width="55" />
           <el-table-column label="站点" prop="name"></el-table-column>
           <el-table-column label="签到是否成功">
             <template #default="scope">
@@ -32,11 +33,12 @@
 
 <script setup>
 import { siteList } from "../constant/site.js";
-import { onMounted, reactive, toRefs } from "vue";
+import {getCurrentInstance, onMounted, reactive, toRefs} from "vue";
 import { handleSignTask } from "../utils/signIn/index.js";
 import { addSignDate } from "../utils/storage/signDate.js";
 import { storage } from '../utils/storage';
 
+const {proxy} = getCurrentInstance();
 // 核心状态管理
 const state = reactive({
   recordMap: {}, // 签到记录字典
@@ -90,7 +92,8 @@ async function sign(site) {
 
 // 一键全部签到
 async function allSign() {
-  for (const site of siteList) {
+  let selectSite = proxy.$refs.tableRef.getSelectionRows();
+  for (const site of selectSite) {
     let result = await handleSignTask(site);
     if (result.sign) {
       const today = new Date().toISOString().split('T')[0];

@@ -21,10 +21,9 @@ export async function handleSignTask(siteInfo) {
     try {
         // 等待页面加载，并智能跳过 Cloudflare 验证页
         await waitForRealContent(tab.id);
-
-        // 4. 页面正常，继续执行签到逻辑
+        // 继续执行签到逻辑
         let result = await checkSign(tab.id, siteInfo);
-        // await browser.tabs.remove(tab.id);
+        await browser.tabs.remove(tab.id);
         return result;
     } catch (error) {
         console.error("[签到流程] 签到流程异常:", error);
@@ -39,7 +38,6 @@ function startRefreshTest(tabId) {
     console.log(`[Test Mode] 已启动刷新监控，目标 Tab ID: ${tabId}`);
 
     const testListener = async (updatedTabId, changeInfo) => {
-        // 只针对我们关心的那个 Tab，并且只在加载完成时触发
         if (updatedTabId === tabId && changeInfo.status === 'complete') {
             console.log(`[Test Mode] 检测到 Tab ${tabId} 加载完成/刷新，正在尝试注入测试代码...`);
 
@@ -74,24 +72,21 @@ function startRefreshTest(tabId) {
 async function waitForRealContent(tabId) {
     return new Promise((resolve, reject) => {
         // 设置一个较长的超时时间，因为 Cloudflare 验证有时需要十几秒
-        const maxWaitTime = 45000;
+        const maxWaitTime = 60000;
         const timer = setTimeout(() => {
             browser.tabs.onUpdated.removeListener(listener);
-            reject(new Error('Page Load Timeout (Cloudflare or Network)'));
+            reject(new Error('Cloudflare 太久了，我不等了'));
         }, maxWaitTime);
 
         const listener = async (updatedTabId, changeInfo) => {
-            // 只关注当前标签页的完成状态
             if (updatedTabId === tabId && changeInfo.status === 'complete') {
                 try {
                     // 检测当前页面是否是 Cloudflare 验证页
                     const isCF = await isCloudflarePage(tabId);
-
                     if (isCF) {
                         console.log(`[Tab ${tabId}] 检测到 Cloudflare 验证页，继续等待跳转...`);
                         return;
                     }
-
                     // 如果不是验证页，说明是真正的目标页面
                     console.log(`[Tab ${tabId}] 目标页面加载完毕，准备注入脚本`);
                     clearTimeout(timer);

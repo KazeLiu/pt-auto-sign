@@ -32,7 +32,7 @@
 </template>
 
 <script setup>
-import { siteList } from "../constant/site.js";
+import { siteList } from "../constant/siteList.js";
 import {getCurrentInstance, onMounted, reactive, toRefs} from "vue";
 import { handleSignTask } from "../utils/sign/index.js";
 import { addSignDate } from "../utils/storage/signDate.js";

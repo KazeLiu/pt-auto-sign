@@ -1,5 +1,4 @@
 export function btSchoolMain() {
-    // 使用属性选择器查找
     const checkInBtn = document.querySelector('a[href*="action=addbonus"]');
 
     if (!checkInBtn) {

@@ -1,6 +1,5 @@
 export function ttgMain() {
     let signedHtml = document.querySelector('.smallfont #sp_signed a#signed');
-    console.log(signedHtml?.innerText)
     if (signedHtml?.innerText === '签到') {
         signedHtml.click();
         return {

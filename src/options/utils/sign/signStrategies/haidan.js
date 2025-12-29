@@ -1,4 +1,3 @@
-
 export function haidanMain() {
     let modalBtn = document.getElementById('modalBtn');
     if (!modalBtn) {

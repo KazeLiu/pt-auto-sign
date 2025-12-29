@@ -34,7 +34,7 @@
 <script setup>
 import { siteList } from "../constant/site.js";
 import {getCurrentInstance, onMounted, reactive, toRefs} from "vue";
-import { handleSignTask } from "../utils/signIn/index.js";
+import { handleSignTask } from "../utils/sign/index.js";
 import { addSignDate } from "../utils/storage/signDate.js";
 import { storage } from '../utils/storage';
 
@@ -113,7 +113,6 @@ const checkIsSignedToday = (siteName) => {
 };
 
 
-// 🌸 5. 生命周期 (Lifecycle)
 onMounted(async () => {
   await saveOnceUseTime();
   await initData();

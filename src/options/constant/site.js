@@ -28,75 +28,75 @@ export const siteList = [
     {
         name: '观众',
         site: "https://audiences.me",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://audiences.me/attendance.php"
     }, {
         name: '大青虫',
         site: "https://cyanbug.net",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://cyanbug.net/attendance.php"
     }, {
         name: '蟹黄堡',
         site: "https://crabpt.vip",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://crabpt.vip/attendance.php"
     }, {
         name: '青蛙',
         site: "https://qingwapt.com",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://qingwapt.com/attendance.php"
     }, {
         name: '末日',
         site: "https://pt.agsvpt.cn",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://pt.agsvpt.cn/attendance.php"
     }, {
         name: '红豆饭',
         site: "https://hdfans.org/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://hdfans.org/attendance.php"
     }, {
         // 需要等待签到结果
         name: '麒麟',
         site: "https://hdkyl.in/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://www.hdkyl.in/attendance.php"
     }, {
         name: 'carPT',
         site: "https://carpt.net/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://carpt.net/attendance.php"
     }, {
         name: '肉丝',
         site: "https://rousi.zip/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://rousi.zip/attendance.php"
     }, {
         // 需要等待签到结果
         name: '优堡',
         site: "https://ubits.club/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://ubits.club/attendance.php"
     }, {
         // 可能有二次验证
         name: '杜比',
         site: "https://hddolby.com/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://www.hddolby.com/attendance.php"
     }, {
         name: '家园',
         site: "https://hdhome.org/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://hdhome.org/attendance.php"
     }, {
         name: '我堡',
         site: "https://ourbits.club/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://ourbits.club/attendance.php"
     }, {
         name: 'RailgunPT',
         site: "https://bilibili.download/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
         targetUrl: "https://bilibili.download/attendance.php"
     }, {
         name: '憨憨',
@@ -106,7 +106,22 @@ export const siteList = [
     }, {
         name: '龟站',
         site: "https://kamept.com/",
-        siteType: 'NexusPHP',
+        siteType: 'nexusPHP',
+        targetUrl: "https://kamept.com/attendance.php"
+    }, {
+        name: '爱萝莉',
+        site: "https://mua.xloli.cc/",
+        siteType: 'nexusPHP',
+        targetUrl: "https://mua.xloli.cc/attendance.php"
+    }, {
+        name: '猪猪',
+        site: "https://piggo.me/",
+        siteType: 'nexusPHP',
+        targetUrl: "https://piggo.me/attendance.php"
+    }, {
+        name: '龟站',
+        site: "https://kamept.com/",
+        siteType: 'nexusPHP',
         targetUrl: "https://kamept.com/attendance.php"
     }];
 

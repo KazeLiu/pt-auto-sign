@@ -1,6 +1,4 @@
 <template>
-<!--  <el-button @click="a">A</el-button>-->
-<!--  <el-button @click="b">B</el-button>-->
   <router-view></router-view>
 </template>
 

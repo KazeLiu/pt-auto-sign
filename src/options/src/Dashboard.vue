@@ -2,12 +2,9 @@
   <div class="page-content">
     <h1>概览</h1>
     <el-card class="welcome-card">
-      <div class="flex"><p>欢迎回来！今天也要记得签到哟～ 🌸</p>
-        <el-button @click="allSign">一键全部签到</el-button>
-      </div>
       <div class="stats">
         <el-table :data="tableData" ref="tableRef">
-          <el-table-column type="selection" width="55" />
+          <el-table-column type="selection" width="55"/>
           <el-table-column label="站点" prop="name"></el-table-column>
           <el-table-column label="签到是否成功">
             <template #default="scope">
@@ -32,11 +29,12 @@
 </template>
 
 <script setup>
-import { siteList } from "../constant/siteList.js";
+import {siteList} from "../constant/siteList.js";
 import {getCurrentInstance, onMounted, reactive, toRefs} from "vue";
-import { handleSignTask } from "../utils/sign/index.js";
-import { addSignDate } from "../utils/storage/signDate.js";
-import { storage } from '../utils/storage';
+import {handleSignTask} from "../utils/sign/index.js";
+import {addSignDate} from "../utils/storage/signDate.js";
+import {storage} from '../utils/storage';
+import {sendIyuuNotice} from "../utils/iyuu/index.js";
 
 const {proxy} = getCurrentInstance();
 // 核心状态管理
@@ -46,7 +44,7 @@ const state = reactive({
 });
 
 // 使用 toRefs 保持模板中的引用不变 (recordMap, tableData)
-const { recordMap, tableData } = toRefs(state);
+const {recordMap, tableData} = toRefs(state);
 
 
 // 🌸 2. 数据初始化与加载
@@ -86,6 +84,7 @@ async function sign(site) {
   if (result.sign) {
     const today = new Date().toISOString().split('T')[0];
     await addSignDate(site.name, today);
+    await sendIyuuNotice(`${site.name} 签到结果`, result.sign ? '签到成功' : '签到失败')
     await fetchRecords(); // 刷新记录
   }
 }
@@ -93,13 +92,19 @@ async function sign(site) {
 // 一键全部签到
 async function allSign() {
   let selectSite = proxy.$refs.tableRef.getSelectionRows();
+  let list = [];
   for (const site of selectSite) {
     let result = await handleSignTask(site);
     if (result.sign) {
       const today = new Date().toISOString().split('T')[0];
+      list.push(`${site.name} ：签到成功`)
       await addSignDate(site.name, today);
+    } else {
+      list.push(`${site.name} ：签到失败`)
     }
   }
+
+  await sendIyuuNotice(`签到结果`, list.join('   '))
   await fetchRecords(); // 全部完成后刷新
 }
 

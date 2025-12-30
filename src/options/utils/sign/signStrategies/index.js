@@ -4,9 +4,11 @@ import {haidanMain} from "./haidan.js";
 import {btSchoolMain} from "./btSchool.js";
 import {ttgMain} from "./ttg.js";
 import {u2Main} from "./u2.js";
+import {online} from "./online.js";
 
 const STRATEGY_MAP = {
     nexusPHP,
+    online,
     HanHan: hanhanMain,
     HaiDan: haidanMain,
     btSchool: btSchoolMain,

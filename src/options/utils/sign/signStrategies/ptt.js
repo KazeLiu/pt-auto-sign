@@ -7,7 +7,7 @@ export function pttMain() {
             text: body.innerText
         }
     }
-    if (body?.innerText === '已签到') {
+    if (body?.innerText.includes('已签到')) {
         return {
             sign: true,
             title: '已签到',

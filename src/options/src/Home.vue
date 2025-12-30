@@ -32,7 +32,7 @@
 
 <script setup>
 import {siteList} from "../constant/siteList.js";
-import {getCurrentInstance, onMounted, reactive, toRefs} from "vue";
+import {getCurrentInstance, nextTick, onMounted, reactive, toRefs} from "vue";
 import {handleSignTask} from "../utils/sign/index.js";
 import {addSignDate} from "../utils/storage/signDate.js";
 import {storage} from '../utils/storage';
@@ -118,10 +118,27 @@ const checkIsSignedToday = (siteName) => {
   return dates && dates.includes(dayStr);
 };
 
+// 自动勾选未签到的项目
+const autoSelectUnsigned = () => {
+  nextTick(() => {
+    if (proxy.$refs.tableRef) {
+      proxy.$refs.tableRef.clearSelection();
+
+      state.tableData.forEach(row => {
+        // 如果今天还没签到，就勾选上
+        if (!checkIsSignedToday(row.name)) {
+          proxy.$refs.tableRef.toggleRowSelection(row, true);
+        }
+      });
+    }
+  });
+};
+
 
 onMounted(async () => {
   await saveOnceUseTime();
   await initData();
+  autoSelectUnsigned();
 });
 </script>
 

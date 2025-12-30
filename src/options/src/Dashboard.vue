@@ -2,6 +2,9 @@
   <div class="page-content">
     <h1>概览</h1>
     <el-card class="welcome-card">
+      <div class="flex"><p>欢迎回来！今天也要记得签到哟～ 🌸</p>
+        <el-button @click="allSign">一键全部签到</el-button>
+      </div>
       <div class="stats">
         <el-table :data="tableData" ref="tableRef">
           <el-table-column type="selection" width="55"/>

@@ -1,18 +1,32 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 
 // 注意这里的路径：.. 代表回到 options 目录，然后进入 src 目录找组件
-import Dashboard from '../src/Dashboard.vue';
+import Home from '../src/Home.vue';
+import Setting from '../src/Setting.vue';
+import Push from '../src/Push.vue';
 
 const routes = [
     {
         path: '/',
-        redirect: '/dashboard'
+        redirect: '/Home'
     },
     {
-        path: '/dashboard',
-        component: Dashboard,
-        name: 'Dashboard',
+        path: '/Home',
+        component: Home,
+        name: 'Home',
         meta: { title: '概览' }
+    },
+    {
+        path: '/Setting',
+        component: Setting,
+        name: 'Setting',
+        meta: { title: '设置' }
+    },
+    {
+        path: '/Push',
+        component: Push,
+        name: 'Push',
+        meta: { title: '推送设置' }
     }
 ];
 

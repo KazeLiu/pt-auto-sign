@@ -1,4 +1,4 @@
-import {iyuuToken} from "../../constant/index.js";
+import {getIyuuKey} from "../storage/pushData.js";
 
 /**
  * 发送 IYUU 通知的方法
@@ -6,6 +6,10 @@ import {iyuuToken} from "../../constant/index.js";
  * @param {string} desp - 消息内容详情
  */
 export const sendIyuuNotice = async (text, desp = '') => {
+    let iyuuToken = await getIyuuKey();
+    if (!iyuuToken) {
+        return;
+    }
     const url = `https://iyuu.cn/${iyuuToken}.send`;
 
     try {

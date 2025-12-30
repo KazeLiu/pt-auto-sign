@@ -1,33 +1,32 @@
 <template>
   <div class="page-content">
-    <h1>概览</h1>
-    <el-card class="welcome-card">
-      <div class="flex"><p>欢迎回来！今天也要记得签到哟～ 🌸</p>
-        <el-button @click="allSign">一键全部签到</el-button>
-      </div>
-      <div class="stats">
-        <el-table :data="tableData" ref="tableRef">
-          <el-table-column type="selection" width="55"/>
-          <el-table-column label="站点" prop="name"></el-table-column>
-          <el-table-column label="签到是否成功">
-            <template #default="scope">
-              <el-tag v-if="checkIsSignedToday(scope.row.name)" type="success">已签到</el-tag>
-              <el-tag v-else type="danger">未签到</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="签到地址" prop="targetUrl" width="500">
-            <template #default="scope">
-              <a :href="scope.row.targetUrl">{{ scope.row.targetUrl }}</a>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作">
-            <template #default="scope">
-              <el-button @click="sign(scope.row)">再次尝试签到</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </el-card>
+    <div class="flex justify-between items-center">
+      <p>欢迎回来！今天也要记得签到</p>
+      <el-button @click="allSign">一键全部签到</el-button>
+    </div>
+    <div class="stats">
+      <el-table :data="tableData" ref="tableRef">
+        <el-table-column type="selection" width="55"/>
+        <el-table-column label="站点" prop="name"></el-table-column>
+        <el-table-column label="签到是否成功">
+          <template #default="scope">
+            <el-tag v-if="checkIsSignedToday(scope.row.name)" type="success">已签到</el-tag>
+            <el-tag v-else type="danger">未签到</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="签到地址" prop="targetUrl" width="500">
+          <template #default="scope">
+            <a target="_blank"
+               :href="scope.row.targetUrl || scope.row.site">{{ scope.row.targetUrl || scope.row.site }}</a>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作">
+          <template #default="scope">
+            <el-button @click="sign(scope.row)">再次尝试签到</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
   </div>
 </template>
 
@@ -129,10 +128,6 @@ onMounted(async () => {
 <style scoped>
 .page-content {
   padding: 20px;
-}
-
-.welcome-card {
-  margin-top: 20px;
 }
 
 .stats {

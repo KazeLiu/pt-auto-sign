@@ -8,9 +8,9 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.17",
+    "@tailwindcss/vite": "^4.1.18",
     "element-plus": "^2.12.0",
-    "tailwindcss": "^4.1.17",
+    "tailwindcss": "^4.1.18",
     "vue": "^3.3",
     "vue-router": "^4.6.3"
   },

@@ -8,7 +8,7 @@ import { waitUntilPageReady } from "../tab/throughShield.js";
 import { runSignScript } from "./signExecutor.js";
 
 export async function handleSignTask(siteInfo) {
-    const tab = await createSignTab(siteInfo.targetUrl);
+    const tab = await createSignTab(siteInfo.targetUrl || siteInfo.site);
 
     try {
         console.log(`[签到流程] 开始 ${siteInfo.name}`);

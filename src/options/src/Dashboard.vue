@@ -50,7 +50,6 @@ const state = reactive({
 const {recordMap, tableData} = toRefs(state);
 
 
-// 🌸 2. 数据初始化与加载
 // 从 Storage 加载记录并转换为 Map
 async function fetchRecords() {
   const rawRecords = await storage.get('site_sign_records', []);
@@ -107,7 +106,7 @@ async function allSign() {
     }
   }
 
-  await sendIyuuNotice(`签到结果`, list.join('   '))
+  await sendIyuuNotice(`签到结果`, list.join('/r/n'))
   await fetchRecords(); // 全部完成后刷新
 }
 

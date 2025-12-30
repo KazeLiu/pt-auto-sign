@@ -10,28 +10,33 @@
  * - text {string}: 签到区域文本内容（可选）
  */
 export function u2Main() {
-    // 获取签到区域的标题和文本内容
-    let signTitle = document.querySelector('td.outer table.main .embedded h2')?.innerText;
-    let signText = document.querySelector('td.outer table.main .embedded table .text')?.innerText;
-    // 检查是否为签到区域
-    if (signTitle === '签到区' && signText !== '感谢，今天已签到。') {
-        // 自动填写签到内容
-        document.querySelector('td.outer table.main .embedded textarea').innerText = '59个UCoin';
-        // 查找并点击提交按钮
-        let submitBtn = document.querySelector('td.outer table.main .embedded table.captcha input[type=submit]');
-        if (submitBtn) {
-            submitBtn.click();
-        }
-    }
-    if (signText !== '感谢，今天已签到。') {
+    const signTitle = document.querySelector('td.outer table.main .embedded h2')?.innerText;
+    const signText = document.querySelector('td.outer table.main .embedded table .text')?.innerText;
+    // 已经签到成功（刷新后的状态）
+    if (signText === '感谢，今天已签到。') {
         return {
             sign: true,
             title: signTitle,
             text: signText
+        };
+    }
+
+    // 还在签到页，尝试提交
+    if (signTitle === '签到区') {
+        const textarea = document.querySelector('td.outer table.main .embedded textarea');
+        const submitBtn = document.querySelector('td.outer table.main .embedded table.captcha input[type=submit]');
+
+        if (textarea && submitBtn) {
+            textarea.value = '59个UCoin';
+            submitBtn.click();
+
+            return {
+                sign: false,
+                pending: true
+            };
         }
     }
-    //所有策略都失败
-    return {
-        sign: false
-    };
+
+    // 兜底失败
+    return { sign: false };
 }

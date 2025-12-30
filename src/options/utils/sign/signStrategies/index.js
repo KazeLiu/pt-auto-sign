@@ -4,18 +4,19 @@ import {haidanMain} from "./haidan.js";
 import {btSchoolMain} from "./btSchool.js";
 import {ttgMain} from "./ttg.js";
 import {u2Main} from "./u2.js";
-import {online} from "./online.js";
+import {onlineMian} from "./online.js";
+import {pttMain} from "./ptt.js";
 
 const STRATEGY_MAP = {
-    nexusPHP,
-    online,
-    HanHan: hanhanMain,
-    HaiDan: haidanMain,
-    btSchool: btSchoolMain,
-    ttg: ttgMain,
-    U2: u2Main,
+    HanHan: hanhanMain, // 憨憨
+    HaiDan: haidanMain, // 海胆
+    btSchool: btSchoolMain, // 学校
+    ttg: ttgMain, // 听听歌
+    U2: u2Main, // 幼儿园
+    ptt:pttMain, // ptt
+    online:onlineMian, // 只访问，防止太久不上号被封号 没有验证策略 不知道有没有登录
 };
 
 export function getSignStrategy(siteType) {
-    return STRATEGY_MAP[siteType] ?? null;
+    return STRATEGY_MAP[siteType] ?? nexusPHP; // 默认使用 NexusPHP 策略
 }

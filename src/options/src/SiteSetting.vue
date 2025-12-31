@@ -113,25 +113,37 @@
 
       <!-- 仅在新增模式下显示：快速预设选择 -->
       <el-form-item label="快速预设" v-if="!dialogState.isEdit">
-        <el-select
-            v-model="dialogState.selectedPreset"
-            placeholder="选择一个常用站点自动填充"
-            @change="actions.applyPreset"
-            class="w-full"
-            filterable
-        >
-          <el-option label="自定义" value="custom"></el-option>
-          <el-option
-              v-for="site in SITE_LIST"
-              :key="site.name"
-              :label="site.name"
-              :value="site.name">
-            <div class="flex justify-between items-center">
-              <span class="float-left">{{ site.name }}</span>
-              <span class="float-right text-gray-400 text-xs ml-2">{{ site.siteType }}</span>
-            </div>
-          </el-option>
-        </el-select>
+        <div class="flex gap-3 items-center w-full">
+          <el-select
+              v-model="dialogState.selectedPreset"
+              placeholder="选择一个常用站点自动填充"
+              @change="actions.applyPreset"
+              class="w-full"
+              filterable
+          >
+            <el-option label="自定义" value="custom"></el-option>
+            <el-option
+                v-for="site in SITE_LIST"
+                :key="site.name"
+                :label="site.name"
+                :value="site.name">
+              <div class="flex justify-between items-center">
+                <span class="float-left">{{ site.name }}</span>
+                <span class="float-right text-gray-400 text-xs ml-2">{{ site.siteType }}</span>
+              </div>
+            </el-option>
+          </el-select>
+          <el-tooltip>
+            <template #content>
+              <div class="max-w-[260px] text-xs leading-5">
+                快速预设只是举例，请选择自定义后手填
+              </div>
+            </template>
+            <el-icon class="text-gray-400 cursor-help hover:text-blue-500 text-sm">
+              <QuestionFilled/>
+            </el-icon>
+          </el-tooltip>
+        </div>
       </el-form-item>
 
       <el-divider v-if="!dialogState.isEdit" content-position="center" border-style="dashed">站点详情</el-divider>
@@ -141,7 +153,7 @@
       </el-form-item>
 
       <el-form-item label="站点类型" required>
-        <div class="flex gap-1 w-full items-center">
+        <div class="flex gap-3 w-full items-center">
           <el-select
               v-model="formModel.siteType"
               placeholder="请选择或输入新类型"
@@ -176,7 +188,7 @@
       </el-form-item>
 
       <el-form-item label="是否跳过验证" required>
-        <div class="flex gap-1 w-full items-center">
+        <div class="flex gap-3 w-full items-center justify-between">
           <el-switch v-model="formModel.notVerifyPage" active-text="跳过" inactive-text="不跳过" inline-prompt
                      active-color="#13ce66"/>
           <el-tooltip placement="top" effect="light">

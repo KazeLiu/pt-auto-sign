@@ -18,32 +18,7 @@ const createNexusSite = (name, domain) => ({
 });
 
 export const SITE_LIST = [
-    // --- 特殊处理站点 ---
-    {
-        name: 'U2',
-        siteType: SITE_TYPES.U2, // 统一使用常量引用
-        site: "https://u2.dmhy.org/showup.php"
-    },
-    {
-        name: '海胆',
-        siteType: SITE_TYPES.HAIDAN,
-        site: "https://www.haidan.video/"
-    },
-    {
-        name: 'BTSCHOOL',
-        siteType: SITE_TYPES.BTSCHOOL,
-        site: "https://pt.btschool.club/index.php?action=addbonus"
-    },
-    {
-        name: 'ToTheGlory',
-        siteType: SITE_TYPES.TTG,
-        site: "https://totheglory.im/"
-    },
-    {
-        name: '憨憨',
-        siteType: SITE_TYPES.HANHAN,
-        site: "https://hhanclub.top/attendance.php"
-    },
+    // --- 特殊处理站点部分 ---
     {
         name: 'PTTime',
         siteType: SITE_TYPES.PTT,

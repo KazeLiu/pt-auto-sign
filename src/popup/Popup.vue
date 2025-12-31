@@ -39,7 +39,7 @@ const openAndAutoSign = () => {
   chrome.windows.create({
     url: url,
     type: 'normal',
-    width: 1200,
+    width: 1600,
     height: 800,
     focused: true
   });

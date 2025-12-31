@@ -1,5 +1,5 @@
 <template>
-  <div >
+  <div>
     <div
         class="bg-white rounded-xl shadow-sm p-6 mb-6 flex justify-between items-center transition hover:shadow-md border border-gray-100">
       <div class="flex flex-col">
@@ -99,7 +99,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="签到地址" prop="site" >
+        <el-table-column label="签到地址" prop="site">
           <template #default="{ row }">
             <a target="_blank" :href="row.site"
                class="text-blue-500 hover:text-blue-700 hover:underline flex items-center gap-1 text-sm transition">
@@ -180,7 +180,8 @@ async function initData() {
   state.loading = true;
   try {
     await fetchRecords();// 加载记录
-    state.tableData = await getSiteData(); //  加载配置的站点
+    let data = await getSiteData(); //  加载配置的站点
+    state.tableData = data.filter(x => x.enabled);
     autoSelectUnsigned();//  自动勾选
   } finally {
     state.loading = false;

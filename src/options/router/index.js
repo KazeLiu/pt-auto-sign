@@ -2,8 +2,8 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 
 // 注意这里的路径：.. 代表回到 options 目录，然后进入 src 目录找组件
 import Home from '../src/Home.vue';
-import Setting from '../src/Setting.vue';
-import Push from '../src/Push.vue';
+import SiteSetting from '../src/SiteSetting.vue';
+import PushSetting from '../src/PushSetting.vue';
 
 const routes = [
     {
@@ -18,13 +18,13 @@ const routes = [
     },
     {
         path: '/Setting',
-        component: Setting,
+        component: SiteSetting,
         name: 'Setting',
         meta: { title: '设置' }
     },
     {
         path: '/Push',
-        component: Push,
+        component: PushSetting,
         name: 'Push',
         meta: { title: '推送设置' }
     }

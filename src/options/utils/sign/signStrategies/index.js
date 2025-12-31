@@ -8,12 +8,12 @@ import {onlineMian} from "./online.js";
 import {pttMain} from "./ptt.js";
 
 const STRATEGY_MAP = {
-    HanHan: hanhanMain, // 憨憨
-    HaiDan: haidanMain, // 海胆
-    btSchool: btSchoolMain, // 学校
-    ttg: ttgMain, // 听听歌
+    HANHAN: hanhanMain, // 憨憨
+    HAIDAN: haidanMain, // 海胆
+    BTSCHOOL: btSchoolMain, // 学校
+    TTG: ttgMain, // 听听歌
     U2: u2Main, // 幼儿园
-    ptt:pttMain, // ptt
+    PTT:pttMain, // ptt
     online:onlineMian, // 只访问，防止太久不上号被封号 没有验证策略 不知道有没有登录
 };
 

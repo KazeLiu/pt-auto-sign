@@ -13,11 +13,8 @@
       />
     </el-menu-item>
     <el-menu-item index="/Home">主页</el-menu-item>
-    <el-sub-menu index="2">
-      <template #title>设置</template>
-      <el-menu-item index="/Setting">站点设置</el-menu-item>
-      <el-menu-item index="/Push">推送设置</el-menu-item>
-    </el-sub-menu>
+    <el-menu-item index="/Setting">站点设置</el-menu-item>
+    <el-menu-item index="/Push">推送设置</el-menu-item>
 
     <div class="flex-grow" />
 
@@ -31,9 +28,14 @@
   </el-menu>
   <router-view v-slot="{ Component }">
     <transition name="fade" mode="out-in">
-      <component :is="Component"/>
+      <div class="page-content min-h-screen bg-gray-50 p-6">
+        <component :is="Component"/>
+      </div>
     </transition>
   </router-view>
+  <div class="text-center w100 p-6 bg-gray-50">
+    本程序只能帮您轮流打开签到页面然后关闭页面来进行签到，无其他用途，请勿用于非法用途。如果遇到问题，请在GitHub上反馈给我。
+  </div>
 </template>
 
 <script setup>

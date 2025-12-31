@@ -8,7 +8,7 @@ import {waitUntilPageReady} from "../tab/throughShield.js";
 import {runSignScript} from "./signExecutor.js";
 
 export async function handleSignTask(siteInfo) {
-    const tab = await createSignTab(siteInfo.targetUrl || siteInfo.site);
+    const tab = await createSignTab(siteInfo.site);
 
     try {
         console.log(`[签到流程] 开始 ${siteInfo.name}`);
@@ -28,6 +28,6 @@ export async function handleSignTask(siteInfo) {
         console.error("[签到流程] 异常：", err);
         return {sign: false, msg: err.message};
     } finally {
-        await closeTabSafe(tab.id);
+        // await closeTabSafe(tab.id);
     }
 }

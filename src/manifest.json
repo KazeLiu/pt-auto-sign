@@ -8,6 +8,7 @@
     "128": "icon/128.png"
   },
   "{{chrome}}.action": {
+    "default_popup": "src/popup/popup.html"
   },
   "{{chrome}}.options_ui": {
     "page": "src/options/index.html",

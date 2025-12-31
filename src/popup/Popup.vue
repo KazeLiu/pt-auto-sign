@@ -1,31 +1,3 @@
-<script setup>
-import { ref } from 'vue';
-import { startSignProcess } from '../logic/signer.js';
-
-const isSigning = ref(false);
-const statusMsg = ref('');
-
-const handleSignIn = async () => {
-  if (isSigning.value) return;
-
-  isSigning.value = true;
-  statusMsg.value = '准备中...';
-
-  try {
-    // 调用逻辑模块的方法
-    const result = await startSignProcess();
-    statusMsg.value = result.message;
-  } catch (error) {
-    statusMsg.value = '出错了哦';
-    console.error(error);
-  }
-  // 稍微延迟一下恢复状态，让用户看到反馈
-  setTimeout(() => {
-    isSigning.value = false;
-  }, 1000);
-};
-</script>
-
 <template>
   <div class="container">
     <div class="header">
@@ -38,23 +10,41 @@ const handleSignIn = async () => {
         <p>欢迎使用</p>
       </div>
 
-      <button
-          class="sign-btn"
-          :class="{ 'disabled': isSigning }"
-          @click="handleSignIn"
-      >
-        {{ isSigning ? '正在签到...' : '一键签到' }}
-      </button>
+      <!-- 普通打开，不做操作 -->
+      <div class="sign-btn" type="primary" @click="openOptions">打开设置页</div>
 
-      <p v-if="statusMsg" class="status-text">{{ statusMsg }}</p>
+      <!-- 打开新窗口并自动签到 -->
+      <div class="sign-btn" style="margin-top: 20px" @click="openAndAutoSign">一键自动签到</div>
     </div>
 
     <div class="footer">
-      <p>Author: 蓝宝</p>
+      <p>Author: KazeLiu</p>
     </div>
   </div>
 </template>
+<script setup>
+// 普通打开 options 页面（浏览器标签页模式）
+const openOptions = () => {
+  if (chrome.runtime.openOptionsPage) {
+    chrome.runtime.openOptionsPage();
+  } else {
+    window.open(chrome.runtime.getURL('options.html'));
+  }
+};
 
+// 新窗口打开并自动签到
+const openAndAutoSign = () => {
+  const baseUrl = chrome.runtime.getURL('src/options/index.html');
+  const url = `${baseUrl}#/Home?action=autoSign`;
+  chrome.windows.create({
+    url: url,
+    type: 'normal',
+    width: 1200,
+    height: 800,
+    focused: true
+  });
+};
+</script>
 <style scoped>
 .container {
   width: 400px;
@@ -88,7 +78,7 @@ const handleSignIn = async () => {
   border-radius: 8px;
   padding: 10px;
   margin-bottom: 15px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   font-size: 14px;
 }
 

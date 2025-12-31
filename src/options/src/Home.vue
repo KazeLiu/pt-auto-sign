@@ -37,7 +37,11 @@ import {handleSignTask} from "../utils/sign/index.js";
 import {addSignDate} from "../utils/storage/signDate.js";
 import {storage} from '../utils/storage';
 import {sendIyuuNotice} from "../utils/iyuu/index.js";
+import {useRoute} from "vue-router";
+import router from "../router/index.js";
+import {ElLoading} from "element-plus";
 
+const route = useRoute();
 const {proxy} = getCurrentInstance();
 // 核心状态管理
 const state = reactive({
@@ -81,6 +85,11 @@ async function saveOnceUseTime() {
 // 核心业务逻辑
 // 单个站点签到
 async function sign(site) {
+  const loading = ElLoading.service({
+    lock: true,
+    text: `正在给${site.name}执行签到流程，请等待...`,
+    background: 'rgba(0, 0, 0, 0.7)',
+  })
   let result = await handleSignTask(site);
   if (result.sign) {
     const today = new Date().toISOString().split('T')[0];
@@ -88,12 +97,18 @@ async function sign(site) {
     await sendIyuuNotice(`${site.name} 签到结果`, result.sign ? '签到成功' : '签到失败')
     await fetchRecords(); // 刷新记录
   }
+  loading.close()
 }
 
 // 一键全部签到
 async function allSign() {
   let selectSite = proxy.$refs.tableRef.getSelectionRows();
   let list = [];
+  const loading = ElLoading.service({
+    lock: true,
+    text: `正在执行批量签到流程，请等待...`,
+    background: 'rgba(0, 0, 0, 0.7)',
+  })
   for (const site of selectSite) {
     let result = await handleSignTask(site);
     if (result.sign) {
@@ -106,7 +121,8 @@ async function allSign() {
   }
 
   await sendIyuuNotice(`签到结果`, list.join('/r/n'))
-  await fetchRecords(); // 全部完成后刷新
+  await fetchRecords();
+  loading.close()
 }
 
 
@@ -139,6 +155,17 @@ onMounted(async () => {
   await saveOnceUseTime();
   await initData();
   autoSelectUnsigned();
+
+  if (route.query.action === 'autoSign') {
+    // 稍微延迟一点点，确保 autoSelectUnsigned 的 nextTick 已经执行完毕
+    setTimeout(() => {
+      console.log('检测到自动签到指令，开始执行...');
+      allSign();
+      const query = {...route.query};
+      delete query.action;
+      router.replace({query});
+    }, 800); // 800ms 延迟确保表格选中状态已更新
+  }
 });
 </script>
 

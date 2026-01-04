@@ -37,7 +37,7 @@
         <el-button :icon="Upload" @click="actions.triggerImport" plain>导入配置 JSON</el-button>
         <el-button :icon="Download" @click="actions.exportData" plain>导出配置 JSON</el-button>
       </el-button-group>
-      <el-button :icon="Plus" type="primary" @click="actions.openAddDialog" circle plain title="添加新站点"/>
+      <el-button :icon="Plus" type="primary" @click="actions.openAddDialog" plain >添加新站点</el-button>
     </div>
   </div>
 
@@ -194,7 +194,8 @@
           <el-tooltip placement="top" effect="light">
             <template #content>
               <div class="max-w-[260px] text-xs leading-5">
-                通过页面关键字来判定当前页面是否是等待验证的页面，如果启用，则不等待验证页面。<br/>如果签到页面加载完毕但是程序上没有提示签到成功，那么签到页面上应该有对应的关键字，需要关闭后再次尝试签到
+                通过页面关键字来判定当前页面是否是等待验证的页面，如果启用，则不等待验证页面。<br/>
+                因为有些签到页上会有关键字（比如cloudflare），导致页面是网站签到页但是会被判定为等待页，然后就会超时然后返回签到失败（其实是签到成功了），所以有这种情况的就需要关闭
               </div>
             </template>
             <el-icon class="text-gray-400 cursor-help hover:text-blue-500 text-sm">

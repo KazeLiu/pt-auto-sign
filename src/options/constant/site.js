@@ -7,13 +7,14 @@ export const SITE_TYPES = Object.freeze({
     TTG: 'TTG',
     HANHAN: 'HANHAN',
     PTT: 'PTT',
+    PTER: "PTER",
     ONLINE: 'online',
     nexusPHP: 'nexusPHP'
 });
 
 const createNexusSite = (name, domain) => ({
     name,
-    siteType: SITE_TYPES.NEXUS_PHP,
+    siteType: SITE_TYPES.nexusPHP,
     site: `${domain.replace(/\/$/, '')}/attendance.php` // 自动处理末尾斜杠并拼接
 });
 

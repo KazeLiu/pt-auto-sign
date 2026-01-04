@@ -1,16 +1,17 @@
-export function haidanMain() {
-    let modalBtn = document.getElementById('modalBtn');
-    if (!modalBtn) {
-        console.error('找不到签到按钮！');
-        return {sign: false, error: '找不到按钮'};
-    }
-
-    if (modalBtn.value === '已经打卡') {
+export function PterMain() {
+    let attendanceWrap = document.getElementById('attendance-wrap');
+    if (attendanceWrap) {
         return {
             sign: true,
             title: '已经打卡',
-            text: ''
+            text: attendanceWrap.innerText
         }
+    }
+
+    let modalBtn = document.getElementById('do-attendance');
+    if (!modalBtn) {
+        console.error('找不到签到按钮！');
+        return {sign: false, error: '找不到签到按钮'};
     }
 
     modalBtn.click();
@@ -22,8 +23,10 @@ export function haidanMain() {
         // 定义一个检查器
         const intervalId = setInterval(() => {
             spentTime += 500;
-            let text = document.getElementById('simpleModal').innerText
-            const isTargetPageLoaded = getSignInfo(text);
+            let title = document.querySelector('.jconfirm-title').innerText
+            let content = document.querySelector('.jconfirm-content').innerText
+
+            const isTargetPageLoaded = getSignInfo(title, content);
             if (isTargetPageLoaded.sign) {
                 clearInterval(intervalId);
                 resolve(isTargetPageLoaded);
@@ -37,12 +40,12 @@ export function haidanMain() {
         }, 500);
     });
 
-    function getSignInfo(innerText) {
-        if (innerText.includes('每日打卡')) {
+    function getSignInfo(title, content) {
+        if (title.includes('签到成功')) {
             return {
                 sign: true,
                 title: '签到成功',
-                text: innerText
+                text: content
             }
         }
         return {

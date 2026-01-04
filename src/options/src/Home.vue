@@ -224,9 +224,9 @@ async function sign(site) {
       await addSignDate(site.name, today);
       await sendIyuuNotice(`${site.name} 签到结果`, '签到成功');
       await fetchRecords(); // 刷新记录
-      ElMessage.success(`${site.name} 签到成功啦！🎉`);
+      ElMessage.success(`${site.name} 签到成功！`);
     } else {
-      ElMessage.warning(`${site.name} 似乎没签到成功呢...`);
+      ElMessage.warning(`${site.name} 似乎没签到成功...`);
     }
   } catch (e) {
     console.error(e);

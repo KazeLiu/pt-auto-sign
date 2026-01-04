@@ -209,7 +209,7 @@ async function saveOnceUseTime() {
 async function sign(site) {
   const loadingInstance = ElLoading.service({
     lock: true,
-    text: `正在给 ${site.name} 签到中，风宝努力中...`,
+    text: `正在给 ${site.name} 签到中...`,
     background: 'rgba(255, 255, 255, 0.8)',
   });
 

@@ -6,10 +6,6 @@
     </div>
 
     <div class="content">
-      <div class="welcome-card">
-        <p>欢迎使用</p>
-      </div>
-
       <!-- 普通打开，不做操作 -->
       <div class="sign-btn" type="primary" @click="openOptions">打开设置页</div>
 
@@ -47,7 +43,7 @@ const openAndAutoSign = () => {
 </script>
 <style scoped>
 .container {
-  width: 400px;
+  width: 240px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -108,12 +104,6 @@ const openAndAutoSign = () => {
   background: #e0e0e0;
   cursor: not-allowed;
   transform: none;
-}
-
-.status-text {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #ff9a9e;
 }
 
 .footer {

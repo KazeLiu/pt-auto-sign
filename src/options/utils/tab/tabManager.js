@@ -4,8 +4,8 @@
 
 import browser from "webextension-polyfill";
 
-export async function createSignTab(url) {
-    return await browser.tabs.create({ url, active: true });
+export async function createSignTab(url, opts) {
+    return await browser.tabs.create({url, ...opts});
 }
 
 export async function closeTabSafe(tabId) {

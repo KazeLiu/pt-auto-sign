@@ -138,6 +138,59 @@ class StorageHelper {
         });
     }
 
+    // ================= ✨ 对象专属操作 (Object Ops) =================
+
+    /**
+     * 🔑 设置 / 修改对象里的某个 key
+     * @param {string} key - storage 里的键名
+     * @param {string} field - 对象里的字段名
+     * @param {any} value - 要设置的值
+     */
+    async objectSet(key, field, value) {
+        return await this._modifyObject(key, (obj) => {
+            obj[field] = value;
+            return obj;
+        });
+    }
+
+    /**
+     * ❌ 删除对象里的某个 key
+     */
+    async objectDelete(key, field) {
+        return await this._modifyObject(key, (obj) => {
+            delete obj[field];
+            return obj;
+        });
+    }
+
+    /**
+     * 🧩 批量合并对象（常用于保存设置）
+     * @param {Object} patch - 要合并的新字段
+     */
+    async objectMerge(key, patch) {
+        return await this._modifyObject(key, (obj) => {
+            return {...obj, ...patch};
+        });
+    }
+
+    /**
+     * 🔁 Upsert：存在就改，不存在就用默认值
+     */
+    async objectUpsert(key, field, defaultValue, updateValue) {
+        return await this._modifyObject(key, (obj) => {
+            if (obj[field] === undefined) {
+                obj[field] = typeof defaultValue === 'function'
+                    ? defaultValue()
+                    : defaultValue;
+            } else {
+                obj[field] = typeof updateValue === 'function'
+                    ? updateValue(obj[field])
+                    : updateValue;
+            }
+            return obj;
+        });
+    }
+
 
     // ========= 内部私有方法 (Don't touch me!) =========
 
@@ -164,6 +217,32 @@ class StorageHelper {
             return newList;
         } catch (error) {
             console.error(`😭 [Storage] 修改列表 ${key} 失败:`, error);
+        }
+    }
+
+    /**
+     * 🔒 内部通用的对象修改器
+     */
+    async _modifyObject(key, action) {
+        try {
+            // 1️⃣ 读取（如果没有，初始化为空对象）
+            const obj = await this.get(key, {});
+
+            // 🛡️ 安全校验
+            if (typeof obj !== 'object' || Array.isArray(obj) || obj === null) {
+                console.warn(`⚠️ [Storage] Key "${key}" 不是一个对象哟～`);
+                return;
+            }
+
+            // 2️⃣ 执行修改
+            const newObj = action({...obj});
+
+            // 3️⃣ 存回
+            await this.set(key, newObj);
+
+            return newObj;
+        } catch (error) {
+            console.error(`😭 [Storage] 修改对象 ${key} 失败:`, error);
         }
     }
 }

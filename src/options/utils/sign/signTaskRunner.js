@@ -2,16 +2,16 @@
  * 签到流程
  */
 
-import browser from "webextension-polyfill";
 import {createSignTab, closeTabSafe} from "../tab/tabManager.js";
 import {waitUntilPageReady} from "../tab/throughShield.js";
 import {runSignScript} from "./signExecutor.js";
 
 export async function handleSignTask(siteInfo) {
-    const tab = await createSignTab(siteInfo.site);
+    let opts = siteInfo.active ? {active: true} : {active: false, pinned: true};
+    const tab = await createSignTab(siteInfo.site, opts);
 
     try {
-        console.log(`[签到流程] 开始 ${siteInfo.name}`);
+        console.log(`[${siteInfo.name} 签到流程] 开始 ${siteInfo.name}`);
         if (!siteInfo.notVerifyPage) {
             await waitUntilPageReady(tab.id);
         }
@@ -25,7 +25,7 @@ export async function handleSignTask(siteInfo) {
         }
         return result;
     } catch (err) {
-        console.error("[签到流程] 异常：", err);
+        console.error(`[${siteInfo.name} 签到流程] 异常：`, err);
         return {sign: false, msg: err.message};
     } finally {
         await closeTabSafe(tab.id);

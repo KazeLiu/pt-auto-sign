@@ -16,12 +16,15 @@
               <span class="text-red-400">请先仔细阅读提示词，然后在提示词最下面写入站点名称和站点签到的URL再给AI处理</span>
             </div>
             <div class="bg-gray-50 border border-gray-200 border-solid rounded-lg p-3 text-xs text-gray-500 relative">
-              <div class="max-h-32 overflow-y-auto whitespace-pre-wrap cursor-text selection:bg-blue-100">请作为数据处理专家，根据我提供的站点列表，生成一个符合以下结构的 JSON 数组 , 然后请手把手教我怎么再Windows系统内创建一个JSON文件：
+              <div class="max-h-32 overflow-y-auto whitespace-pre-wrap cursor-text selection:bg-blue-100">
+                请作为数据处理专家，根据我提供的站点列表，生成一个符合以下结构的 JSON 数组 ,
+                然后请手把手教我怎么再Windows系统内创建一个JSON文件：
                 - enabled: 固定为 true
                 - name: 站点名称
                 - notVerifyPage: 固定为 false
                 - site: 站点 URL
                 - siteType: 固定为 nexusPHP。
+                - active: 固定为 false。
 
                 待处理数据如下：
                 [在此处粘贴站点列表，需要写入名称和签到的URL]
@@ -37,7 +40,7 @@
         <el-button :icon="Upload" @click="actions.triggerImport" plain>导入配置 JSON</el-button>
         <el-button :icon="Download" @click="actions.exportData" plain>导出配置 JSON</el-button>
       </el-button-group>
-      <el-button :icon="Plus" type="primary" @click="actions.openAddDialog" plain >添加新站点</el-button>
+      <el-button :icon="Plus" type="primary" @click="actions.openAddDialog" plain>添加新站点</el-button>
     </div>
   </div>
 
@@ -66,6 +69,13 @@
         <template #default="{ row }">
           <el-tag v-if="row.notVerifyPage" type="warning" size="small" class="ml-1 origin-left" effect="plain">
             跳过验证
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="前台激活" width="180">
+        <template #default="{ row }">
+          <el-tag v-if="row.active" type="error" size="small" class="ml-1 origin-left" effect="plain">
+            前台激活
           </el-tag>
         </template>
       </el-table-column>
@@ -204,7 +214,23 @@
           </el-tooltip>
         </div>
       </el-form-item>
-
+      <el-form-item label="前台激活页面">
+        <div class="flex gap-3 w-full items-center justify-between">
+          <el-switch v-model="formModel.active" active-text="启用" inactive-text="停用" inline-prompt
+                     active-color="#13ce66"/>
+          <el-tooltip placement="top" effect="light">
+            <template #content>
+              <div class="max-w-[260px] text-xs leading-5">
+                前台激活会直接打开页面，会影响正常使用，主要是cloudflare会判定页面是否在前台，如果在后台则无法通过验证。<br/>
+                关闭的时候是后台静默，后台静默还是会打开标签页，它会在浏览器添加一个小的图标标签然后执行判定脚本，不会影响正常使用。
+              </div>
+            </template>
+            <el-icon class="text-gray-400 cursor-help hover:text-blue-500 text-sm">
+              <QuestionFilled/>
+            </el-icon>
+          </el-tooltip>
+        </div>
+      </el-form-item>
       <el-form-item label="是否启用">
         <el-switch v-model="formModel.enabled" active-text="启用" inactive-text="停用" inline-prompt
                    active-color="#13ce66"/>
@@ -253,12 +279,13 @@ const formModel = reactive({
   siteType: '',
   site: '',
   enabled: true,
+  active: false,
   notVerifyPage: false
 });
 
 const actions = {
   // 初始化数据
-  initData: async () => {
+  init: async () => {
     appState.loading = true;
     appState.list = await getSiteData();
     appState.loading = false;
@@ -275,14 +302,23 @@ const actions = {
   openAddDialog: () => {
     dialogState.isEdit = false;
     dialogState.selectedPreset = '';
-    Object.assign(formModel, {name: '', siteType: '', site: '', enabled: true, notVerifyPage: false});
+    Object.assign(formModel, {
+      name: '', siteType: '', site: '', enabled: true, active: false, notVerifyPage: false
+    });
     dialogState.visible = true;
   },
 
   // 应用预设逻辑
   applyPreset: (val) => {
     if (val === 'custom') {
-      Object.assign(formModel, {name: '', siteType: '', site: '', enabled: true, notVerifyPage: false});
+      Object.assign(formModel, {
+        name: '',
+        siteType: '',
+        site: '',
+        enabled: true,
+        active: false,
+        notVerifyPage: false
+      });
     } else {
       const target = SITE_LIST.find(p => p.name === val);
       if (target) {
@@ -291,6 +327,7 @@ const actions = {
           siteType: target.siteType,
           site: target.site,
           enabled: true,
+          active: false,
           notVerifyPage: target.notVerifyPage || false
         });
       }
@@ -408,7 +445,7 @@ const actions = {
 };
 
 onMounted(() => {
-  actions.initData();
+  actions.init();
 });
 </script>
 

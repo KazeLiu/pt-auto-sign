@@ -13,8 +13,8 @@
       />
     </el-menu-item>
     <el-menu-item index="/Home">主页</el-menu-item>
-    <el-menu-item index="/Setting">站点设置</el-menu-item>
-    <el-menu-item index="/Push">推送设置</el-menu-item>
+    <el-menu-item index="/SiteSetting">站点设置</el-menu-item>
+    <el-menu-item index="/Setting">其他设置</el-menu-item>
 
     <div class="flex-grow" />
 

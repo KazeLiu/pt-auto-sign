@@ -1,20 +1,23 @@
 export function PterMain() {
     let attendanceWrap = document.getElementById('attendance-wrap');
     if (attendanceWrap) {
-        return {
-            sign: true,
-            title: '已经打卡',
-            text: attendanceWrap.innerText
+        if (attendanceWrap.innerText.includes('签到得猫粮')) {
+            let modalBtn = document.getElementById('do-attendance');
+            if (!modalBtn) {
+                console.error('找不到签到按钮！');
+                return {sign: false, error: '找不到签到按钮'};
+            }
+            modalBtn.click();
+        }
+        if (attendanceWrap.innerText.includes('签到已得')) {
+            return {
+                sign: true,
+                title: '已经打卡',
+                text: attendanceWrap.innerText
+            }
         }
     }
 
-    let modalBtn = document.getElementById('do-attendance');
-    if (!modalBtn) {
-        console.error('找不到签到按钮！');
-        return {sign: false, error: '找不到签到按钮'};
-    }
-
-    modalBtn.click();
 
     return new Promise((resolve) => {
         const maxTime = 15000; // 最多等15秒，防止死循环

@@ -13,7 +13,8 @@
           <div class="prompt-container w-80 font-sans leading-relaxed text-gray-700 p-1">
             <div class="flex flex-col justify-between items-center mb-2">
               <span class="font-semibold text-gray-600 text-sm">如果你不会修改 JSON 文件，你可以复制下面的提示词丢给 AI 处理，导入后再修改需要单独配置规则的网站</span>
-              <span class="text-red-400">请先仔细阅读提示词，然后在提示词最下面写入站点名称和站点签到的URL再给AI处理</span>
+              <span
+                  class="text-red-400">请先仔细阅读提示词，然后在提示词最下面写入站点名称和站点签到的URL再给AI处理</span>
             </div>
             <div class="bg-gray-50 border border-gray-200 border-solid rounded-lg p-3 text-xs text-gray-500 relative">
               <div class="max-h-32 overflow-y-auto whitespace-pre-wrap cursor-text selection:bg-blue-100">
@@ -402,45 +403,48 @@ const actions = {
   handleFileImport: (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const importedData = JSON.parse(e.target.result);
-        if (Array.isArray(importedData)) {
-          let addedCount = 0;
-          // 简单的去重逻辑：如果 URL 不存在才添加
-          importedData.forEach(item => {
-            const exists = appState.list.some(old => old.site === item.site);
-            if (!exists) {
-              // 确保新导入的数据有默认字段
-              appState.list.push({
-                enabled: true,
-                notVerifyPage: false,
-                siteType: "nexusPHP",
-                ...item
-              });
-              addedCount++;
-            }
-          });
-          actions.saveAllData();
-          console.log(`[站点列表] 站点导入成功 ${addedCount} 个`, appState.list)
-          if (addedCount > 0) {
-            ElMessage.success(`成功导入了 ${addedCount} 个新站点`);
-          } else {
-            ElMessage.info('导入的数据看起来都已经存在');
-          }
-        } else {
-          ElMessage.error('文件格式不对，需要 JSON 数组格式');
+    ElMessageBox.confirm(
+        '导入操作将【清空并覆盖】当前所有站点数据，此操作无法撤销。\n确定要继续吗？',
+        '覆盖确认',
+        {
+          confirmButtonText: '确定覆盖',
+          cancelButtonText: '取消',
+          type: 'warning',
         }
-      } catch (err) {
-        ElMessage.error('解析失败，请检查 JSON 文件是否正确。');
-        console.error(err);
-      }
-      // 清空 input 方便下次重复选择同个文件
-      event.target.value = '';
-    };
-    reader.readAsText(file);
+    )
+        .then(() => {
+          // 2. 用户点击“确定”后，才开始读取文件
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const importedData = JSON.parse(e.target.result);
+              if (Array.isArray(importedData)) {
+                // 3. 直接覆盖数据，不再去重
+                appState.list = importedData.map(item => ({
+                  enabled: true,
+                  notVerifyPage: false,
+                  siteType: "nexusPHP",
+                  ...item
+                }));
+                actions.saveAllData();
+                console.log(`[站点列表] 站点数据已覆盖，共 ${appState.list.length} 个`);
+                ElMessage.success(`导入成功！现有列表已被 ${appState.list.length} 个新站点覆盖`);
+              } else {
+                ElMessage.error('文件格式不对，需要 JSON 数组格式');
+              }
+            } catch (err) {
+              ElMessage.error('解析失败，请检查 JSON 文件是否正确。');
+              console.error(err);
+            }
+            // 无论成功还是失败，最后都清空 input，方便下次选择
+            event.target.value = '';
+          };
+          reader.readAsText(file);
+        })
+        .catch(() => {
+          ElMessage.info('已取消导入');
+          event.target.value = '';
+        });
   },
 };
 

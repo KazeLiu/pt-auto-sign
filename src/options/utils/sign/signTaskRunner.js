@@ -148,6 +148,6 @@ export async function handleSignTask(siteInfo) {
         console.error(`[${siteInfo.name} 签到流程] 异常：`, err);
         return {sign: false, msg: err.message};
     } finally {
-        // await closeTabSafe(tab.id);
+        await closeTabSafe(tab.id);
     }
 }

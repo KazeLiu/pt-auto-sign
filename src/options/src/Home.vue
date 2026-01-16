@@ -248,10 +248,11 @@ const signModel = reactive({
 
     try {
       for (const site of selectSite) {
-        if (tableModel.checkIsSignedToday(site.name)) {
-          reportList.push(`${site.name} ：已签到 (跳过)`);
-          continue;
-        }
+        // 有时候报错，没有签到也说签到了，现在取消一键签到中判定签到的逻辑
+        // if (tableModel.checkIsSignedToday(site.name)) {
+        //   reportList.push(`${site.name} ：已签到 (跳过)`);
+        //   continue;
+        // }
 
         const runInBackground = settingModel.allOpen && !site.active;
 

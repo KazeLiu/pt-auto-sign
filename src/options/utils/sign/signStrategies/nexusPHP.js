@@ -1,6 +1,3 @@
-import browser from "webextension-polyfill";
-import {sleep} from "../../index.js";
-
 export function nexusPHP() {
     let signTitle = document.querySelector('td.outer table.main .embedded h2')?.innerText;
     let signText = document.querySelector('td.outer table.main .embedded table .text')?.innerText;
@@ -14,8 +11,8 @@ export function nexusPHP() {
     }
     //所有策略都失败
     return {
-        sign: false
-        , title: signTitle,
+        sign: false,
+        title: signTitle,
         text: signText
     };
 }

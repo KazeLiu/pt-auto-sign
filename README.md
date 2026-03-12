@@ -17,7 +17,7 @@
 
 [Chrome应用商店](https://chromewebstore.google.com/detail/pt-auto-sign/hpgbdbjnhfhpcbieaiapmcmbhmmcpkno)
 
-[这是使用方法](docs/doc.md)
+[这是使用方法，使用真的很简单](docs/doc.md)
 
 
 ## 原理

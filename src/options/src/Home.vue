@@ -238,51 +238,87 @@ const signModel = reactive({
 
     signModel.isBatchSigning = true;
     const reportList = [];
-    const backgroundTasks = [];
+
+    // 最大重试次数，比如 1 代表执行一次后，如果有失败，再重试一次
+    const maxRetries = 1;
+    let currentTry = 0;
+    let pendingSites = [...selectSite];
 
     const loadingInstance = ElLoading.service({
       lock: true,
-      text: `正在批量执行 ${selectSite.length} 个任务，请稍候...`,
+      text: `正在批量执行 ${pendingSites.length} 个任务，请稍候...`,
       background: 'rgba(255, 255, 255, 0.9)',
     });
 
     try {
-      for (const site of selectSite) {
-        // 有时候报错，没有签到也说签到了，现在取消一键签到中判定签到的逻辑
-        // if (tableModel.checkIsSignedToday(site.name)) {
-        //   reportList.push(`${site.name} ：已签到 (跳过)`);
-        //   continue;
-        // }
-
-        const runInBackground = settingModel.allOpen && !site.active;
-
-        if (runInBackground) {
-          // 并发模式：直接把 Promise 塞进数组
-          const task = signModel.doSignLogic(site).then(({ msg }) => {
-            reportList.push(msg + ' (并发)');
-          });
-          backgroundTasks.push(task);
-        } else {
-          // 顺序模式：等待结果
-          const { msg } = await signModel.doSignLogic(site);
-          reportList.push(msg);
+      while (currentTry <= maxRetries && pendingSites.length > 0) {
+        if (currentTry > 0) {
+          loadingInstance.setText(`正在进行第 ${currentTry} 次重试，剩余 ${pendingSites.length} 个站点...`);
+          // 稍微停顿一下，避免频繁请求
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
+
+        const backgroundTasks = [];
+        const currentPassResults = [];
+        const failedSites = [];
+
+        for (const site of pendingSites) {
+          const runInBackground = settingModel.allOpen && !site.active;
+          if (runInBackground) {
+            // 并发模式：直接把 Promise 塞进数组
+            const task = signModel.doSignLogic(site).then((res) => {
+              currentPassResults.push({ site, res, background: true });
+            });
+            backgroundTasks.push(task);
+          } else {
+            // 顺序模式：等待结果
+            const res = await signModel.doSignLogic(site);
+            currentPassResults.push({ site, res, background: false });
+          }
+        }
+
+        // 等待所有后台任务完成
+        if (backgroundTasks.length > 0) {
+          await Promise.all(backgroundTasks);
+        }
+
+        // 整理当前这一轮的执行结果
+        for (const { site, res, background } of currentPassResults) {
+          if (res.success) {
+            reportList.push(res.msg + (background ? ' (并发)' : ''));
+          } else {
+            failedSites.push(site);
+          }
+        }
+
+        // 把失败的站点记录下来，留给下一次重试
+        pendingSites = failedSites;
+        currentTry++;
       }
 
-      // 等待所有后台任务完成
-      if (backgroundTasks.length > 0) {
-        await Promise.all(backgroundTasks);
+      // 如果重试完了仍然有失败的站点，在这里记录下来
+      for (const site of pendingSites) {
+        reportList.push(`${site.name} 最终签到失败`);
       }
 
       await sendIyuuNotice(`批量签到结果`, reportList.join('\n'));
       await tableModel.fetchRecords();
-      ElMessage.success('批量任务执行完毕哟！✨');
+
+      // 任务彻底执行完毕后，页面会自动选中还未签到的站点
+      tableModel.autoSelectUnsigned();
+
+      if (pendingSites.length === 0) {
+        ElMessage.success('批量任务全部执行完毕哟！✨');
+      } else {
+        ElMessage.warning(`任务执行完毕，但仍有 ${pendingSites.length} 个站点失败，已被重新勾选。`);
+      }
 
     } finally {
       loadingInstance.close();
       signModel.isBatchSigning = false;
     }
   },
+
   async doSignLogic(site) {
     let resultData = { success: false, msg: '' };
     try {

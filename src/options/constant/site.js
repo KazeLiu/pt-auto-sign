@@ -8,6 +8,7 @@ export const SITE_TYPES = Object.freeze({
     HANHAN: 'HANHAN',
     PTT: 'PTT',
     PTER: "PTER",
+    ROUSI: "ROUSI",
     ONLINE: 'online',
     nexusPHP: 'nexusPHP'
 });

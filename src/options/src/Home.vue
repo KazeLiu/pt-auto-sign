@@ -13,7 +13,7 @@
       </div>
       <div class="flex gap-3 items-center">
         <el-button @click="tableModel.refreshData" :icon="Refresh" circle plain title="刷新数据"/>
-        <el-button :icon="VideoPlay" type="primary" size="large" @click="signModel.allSign" :loading="signModel.isBatchSigning"
+        <el-button :icon="VideoPlay" type="primary" size="large" @click="signModel.allSign()" :loading="signModel.isBatchSigning"
                    class="shadow-lg shadow-blue-500/30">
           一键全部签到
         </el-button>
@@ -229,7 +229,7 @@ const signModel = reactive({
   },
 
   // 批量签到
-  async allSign() {
+  async allSign(isAutoSign = false) {
     const selectSite = proxy.$refs.tableRef.getSelectionRows();
     if (selectSite.length === 0) {
       ElMessage.warning('请先勾选需要签到的站点哟～');
@@ -316,6 +316,12 @@ const signModel = reactive({
     } finally {
       loadingInstance.close();
       signModel.isBatchSigning = false;
+      if (isAutoSign === true){
+        // 如果是自动签到，则关闭窗口
+        setTimeout(() => {
+          window.close();
+        }, 3000);
+      }
     }
   },
 
@@ -357,7 +363,7 @@ onMounted(async () => {
   if (route.query.action === 'autoSign') {
     setTimeout(() => {
       if (tableModel.tableData.length > 0) {
-        signModel.allSign();
+        signModel.allSign(true);
       }
       const query = { ...route.query };
       delete query.action;

@@ -66,6 +66,45 @@
         </el-form-item>
       </el-form>
     </el-card>
+
+    <!-- 自动签到设置 -->
+    <el-card shadow="hover" class="rounded-xl border-none">
+      <template #header>
+        <div class="card-header">
+          <span>自动签到设置</span>
+        </div>
+      </template>
+
+      <el-form label-width="220px">
+        <el-form-item label="启用自动签到">
+          <div class="flex items-center gap-3">
+            <el-switch v-model="setting.autoSign" @change="saveSetting" active-text="启用" inactive-text="禁用" inline-prompt/>
+            <span class="text-gray-400 text-sm">
+              启用后，插件将在指定时间自动执行签到任务
+            </span>
+          </div>
+        </el-form-item>
+
+        <el-form-item label="自动签到时间">
+          <el-select
+              v-model="setting.autoSignTime"
+              @change="saveSetting"
+              placeholder="请选择执行时间"
+              style="width: 200px"
+          >
+            <el-option
+                v-for="item in timeOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+            />
+          </el-select>
+          <span class="text-gray-400 text-sm ml-3">
+            每天在选定时间自动执行签到
+          </span>
+        </el-form-item>
+      </el-form>
+    </el-card>
   </div>
 </template>
 
@@ -83,6 +122,34 @@ const saveSetting = async () => {
   await setSettingData(setting.value);
   ElMessage.success('保存成功');
 };
+
+const timeOptions = [
+  { label: '00:00', value: '00:00' },
+  { label: '01:00', value: '01:00' },
+  { label: '02:00', value: '02:00' },
+  { label: '03:00', value: '03:00' },
+  { label: '04:00', value: '04:00' },
+  { label: '05:00', value: '05:00' },
+  { label: '06:00', value: '06:00' },
+  { label: '07:00', value: '07:00' },
+  { label: '08:00', value: '08:00' },
+  { label: '09:00', value: '09:00' },
+  { label: '10:00', value: '10:00' },
+  { label: '11:00', value: '11:00' },
+  { label: '12:00', value: '12:00' },
+  { label: '13:00', value: '13:00' },
+  { label: '14:00', value: '14:00' },
+  { label: '15:00', value: '15:00' },
+  { label: '16:00', value: '16:00' },
+  { label: '17:00', value: '17:00' },
+  { label: '18:00', value: '18:00' },
+  { label: '19:00', value: '19:00' },
+  { label: '20:00', value: '20:00' },
+  { label: '21:00', value: '21:00' },
+  { label: '22:00', value: '22:00' },
+  { label: '23:00', value: '23:00' },
+];
+
 
 onMounted(async () => {
   setting.value = await getSettingData();

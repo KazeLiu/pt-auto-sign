@@ -1,7 +1,7 @@
 {
   "name": "PT Auto Sign",
   "private": true,
-  "version": "0.86",
+  "version": "0.9",
   "type": "module",
   "scripts": {
     "dev": "vite",

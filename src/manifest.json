@@ -24,6 +24,7 @@
     ]
   },
   "permissions": [
+    "alarms",
     "scripting",
     "activeTab",
     "storage"

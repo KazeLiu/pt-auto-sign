@@ -1,4 +1,5 @@
 import { SETTINGS_KEY } from "./options/utils/storage/settingData.js";
+import {getDateString} from "./options/utils/index.js";
 
 console.log("Hello from the PT sign");
 
@@ -60,7 +61,7 @@ async function checkMissedAutoSign(settings) {
     // 如果当前时间还未到今天设定的签到时间，则无需补救
     if (now.getTime() <= target.getTime()) return;
 
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getDateString(now);
     const localData = await chrome.storage.local.get([AUTO_SIGN_FLAG_KEY, 'site_sign_records']);
 
     // 1. 检查今天是否已经触发过自动签到（防止浏览器多次重启重复弹窗）
@@ -119,7 +120,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === ALARM_NAME) {
         console.log('[自动签到] 时间到，正在触发弹窗签到任务！');
 
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getDateString();
 
         // 定时器正常触发时，也要记录今日标记，避免重启浏览器时误判漏签
         chrome.storage.local.set({ [AUTO_SIGN_FLAG_KEY]: todayStr }).then(() => {

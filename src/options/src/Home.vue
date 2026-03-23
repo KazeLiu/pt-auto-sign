@@ -1,19 +1,23 @@
 <template>
   <div>
-    <div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex justify-between items-center transition hover:shadow-md border border-gray-100">
+    <div
+        class="bg-white rounded-xl shadow-sm p-6 mb-6 flex justify-between items-center transition hover:shadow-md border border-gray-100">
       <div class="flex flex-col">
         <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
           👋 欢迎回来
           <el-tag effect="plain" round size="small" class="ml-2">多喝热水</el-tag>
         </h1>
         <p class="text-gray-500 text-sm mt-2 flex items-center gap-1">
-          <el-icon><InfoFilled/></el-icon>
+          <el-icon>
+            <InfoFilled/>
+          </el-icon>
           动态验证和登录需自行处理，确保能访问到签到页面后再点击签到
         </p>
       </div>
       <div class="flex gap-3 items-center">
         <el-button @click="tableModel.refreshData" :icon="Refresh" circle plain title="刷新数据"/>
-        <el-button :icon="VideoPlay" type="primary" size="large" @click="signModel.allSign()" :loading="signModel.isBatchSigning"
+        <el-button :icon="VideoPlay" type="primary" size="large" @click="signModel.allSign()"
+                   :loading="signModel.isBatchSigning"
                    class="shadow-lg shadow-blue-500/30">
           一键全部签到
         </el-button>
@@ -23,7 +27,9 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <div class="bg-blue-50 rounded-xl p-4 flex items-center gap-4 border border-blue-100">
         <div class="p-3 bg-blue-100 rounded-lg text-blue-600">
-          <el-icon size="24"><List/></el-icon>
+          <el-icon size="24">
+            <List/>
+          </el-icon>
         </div>
         <div>
           <div class="text-xs text-gray-500">已添加站点</div>
@@ -32,7 +38,9 @@
       </div>
       <div class="bg-green-50 rounded-xl p-4 flex items-center gap-4 border border-green-100">
         <div class="p-3 bg-green-100 rounded-lg text-green-600">
-          <el-icon size="24"><Check/></el-icon>
+          <el-icon size="24">
+            <Check/>
+          </el-icon>
         </div>
         <div>
           <div class="text-xs text-gray-500">今日已签</div>
@@ -41,11 +49,14 @@
       </div>
       <div class="bg-orange-50 rounded-xl p-4 flex items-center gap-4 border border-orange-100">
         <div class="p-3 bg-orange-100 rounded-lg text-orange-600">
-          <el-icon size="24"><Timer/></el-icon>
+          <el-icon size="24">
+            <Timer/>
+          </el-icon>
         </div>
         <div>
           <div class="text-xs text-gray-500">待完成</div>
-          <div class="text-xl font-bold text-gray-800">{{ tableModel.tableData.length - tableModel.signedCount }} 个</div>
+          <div class="text-xl font-bold text-gray-800">{{ tableModel.tableData.length - tableModel.signedCount }} 个
+          </div>
         </div>
       </div>
     </div>
@@ -76,7 +87,9 @@
             </el-tag>
             <el-tag v-else type="danger" effect="plain" round>
               <div class="flex gap-1 items-center">
-                <el-icon class="mr-1"><CloseBold/></el-icon>
+                <el-icon class="mr-1">
+                  <CloseBold/>
+                </el-icon>
                 {{ row.siteType === 'online' ? '未访问' : '未签到' }}
               </div>
             </el-tag>
@@ -84,8 +97,11 @@
         </el-table-column>
         <el-table-column label="签到地址" prop="site">
           <template #default="{ row }">
-            <a target="_blank" :href="row.site" class="text-blue-500 hover:text-blue-700 hover:underline flex items-center gap-1 text-sm transition">
-              <el-icon><Link/></el-icon>
+            <a target="_blank" :href="row.site"
+               class="text-blue-500 hover:text-blue-700 hover:underline flex items-center gap-1 text-sm transition">
+              <el-icon>
+                <Link/>
+              </el-icon>
               {{ row.site }}
             </a>
           </template>
@@ -112,20 +128,21 @@
 </template>
 
 <script setup>
-import { getCurrentInstance, nextTick, onMounted, reactive, computed, ref } from "vue";
-import { useRoute } from "vue-router";
+import {getCurrentInstance, nextTick, onMounted, reactive, computed, ref} from "vue";
+import {useRoute} from "vue-router";
 import router from "../router/index.js";
-import { ElLoading, ElMessage } from "element-plus";
-import { VideoPlay, Refresh, InfoFilled, List, Check, Timer, Select, CloseBold, Link } from '@element-plus/icons-vue';
-import { handleSignTask } from "../utils/sign/index.js";
-import { addSignDate } from "../utils/storage/signDate.js";
-import { storage } from '../utils/storage';
-import { sendIyuuNotice } from "../utils/iyuu/index.js";
-import { getSiteData } from "../utils/storage/siteData.js";
-import { getSettingData } from "../utils/storage/settingData.js";
+import {ElLoading, ElMessage} from "element-plus";
+import {VideoPlay, Refresh, InfoFilled, List, Check, Timer, Select, CloseBold, Link} from '@element-plus/icons-vue';
+import {handleSignTask} from "../utils/sign/index.js";
+import {addSignDate} from "../utils/storage/signDate.js";
+import {storage} from '../utils/storage';
+import {sendIyuuNotice} from "../utils/iyuu/index.js";
+import {getSiteData} from "../utils/storage/siteData.js";
+import {getSettingData} from "../utils/storage/settingData.js";
+import {getDateString} from "../utils/index.js";
 
 const route = useRoute();
-const { proxy } = getCurrentInstance();
+const {proxy} = getCurrentInstance();
 const tableRef = ref(null);
 
 // 设置块
@@ -179,7 +196,10 @@ const tableModel = reactive({
 
   // 检查今日是否已签到
   checkIsSignedToday(siteName) {
-    const dayStr = new Date().toISOString().split('T')[0];
+    // 获取本地日期的 YYYY-MM-DD 格式
+    const now = new Date();
+    const dayStr = getDateString(now);
+
     const dates = this.recordMap[siteName];
     return dates && dates.includes(dayStr);
   },
@@ -212,7 +232,7 @@ const signModel = reactive({
     });
 
     try {
-      const { success, msg } = await signModel.doSignLogic(site);
+      const {success, msg} = await signModel.doSignLogic(site);
 
       if (success) {
         await sendIyuuNotice(`${site.name} 签到结果`, msg);
@@ -267,13 +287,13 @@ const signModel = reactive({
           if (runInBackground) {
             // 并发模式：直接把 Promise 塞进数组
             const task = signModel.doSignLogic(site).then((res) => {
-              currentPassResults.push({ site, res, background: true });
+              currentPassResults.push({site, res, background: true});
             });
             backgroundTasks.push(task);
           } else {
             // 顺序模式：等待结果
             const res = await signModel.doSignLogic(site);
-            currentPassResults.push({ site, res, background: false });
+            currentPassResults.push({site, res, background: false});
           }
         }
 
@@ -283,7 +303,7 @@ const signModel = reactive({
         }
 
         // 整理当前这一轮的执行结果
-        for (const { site, res, background } of currentPassResults) {
+        for (const {site, res, background} of currentPassResults) {
           if (res.success) {
             reportList.push(res.msg + (background ? ' (并发)' : ''));
           } else {
@@ -316,7 +336,7 @@ const signModel = reactive({
     } finally {
       loadingInstance.close();
       signModel.isBatchSigning = false;
-      if (isAutoSign === true){
+      if (isAutoSign === true) {
         // 如果是自动签到，则关闭窗口
         setTimeout(() => {
           window.close();
@@ -326,19 +346,19 @@ const signModel = reactive({
   },
 
   async doSignLogic(site) {
-    let resultData = { success: false, msg: '' };
+    let resultData = {success: false, msg: ''};
     try {
       const result = await handleSignTask(site);
       if (result.sign) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getDateString();
         await addSignDate(site.name, today); // 只有成功才记录日期
-        resultData = { success: true, msg: `${site.name} 签到成功` };
+        resultData = {success: true, msg: `${site.name} 签到成功`};
       } else {
-        resultData = { success: false, msg: `${site.name} 签到失败` };
+        resultData = {success: false, msg: `${site.name} 签到失败`};
       }
     } catch (e) {
       console.error(e);
-      resultData = { success: false, msg: `${site.name} 执行出错` };
+      resultData = {success: false, msg: `${site.name} 执行出错`};
     }
     return resultData;
   },
@@ -365,9 +385,9 @@ onMounted(async () => {
       if (tableModel.tableData.length > 0) {
         signModel.allSign(true);
       }
-      const query = { ...route.query };
+      const query = {...route.query};
       delete query.action;
-      router.replace({ query });
+      router.replace({query});
     }, 1000);
   }
 });

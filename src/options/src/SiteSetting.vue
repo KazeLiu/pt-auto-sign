@@ -386,7 +386,7 @@ const actions = {
     console.log(`[站点列表] 站点导出成功 ${appState.list.length} 个`, dataStr)
     const a = document.createElement('a');
     a.href = url;
-    a.download = `site_config_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `site_config_${new Date().getTime()}.json`;
     document.body.appendChild(a);
     a.click();
 

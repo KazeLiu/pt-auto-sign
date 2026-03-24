@@ -77,22 +77,31 @@
             <el-tag size="small" type="info" effect="plain">{{ row.siteType }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="今日状态" align="center">
+        <el-table-column label="今日状态" align="center" min-width="220">
           <template #default="{ row }">
-            <el-tag v-if="tableModel.checkIsSignedToday(row.name)" type="success" effect="dark" round>
-              <div class="flex gap-1 items-center">
-                <el-icon class="mr-1"><Select/></el-icon>
-                {{ row.siteType === 'online' ? '已访问' : '已签到' }}
-              </div>
-            </el-tag>
-            <el-tag v-else type="danger" effect="plain" round>
-              <div class="flex gap-1 items-center">
-                <el-icon class="mr-1">
-                  <CloseBold/>
-                </el-icon>
-                {{ row.siteType === 'online' ? '未访问' : '未签到' }}
-              </div>
-            </el-tag>
+            <div class="flex flex-col items-center gap-2">
+              <el-tag v-if="tableModel.checkIsSignedToday(row.name)" type="success" effect="dark" round>
+                <div class="flex gap-1 items-center">
+                  <el-icon class="mr-1"><Select/></el-icon>
+                  {{ row.siteType === 'online' ? '已访问' : '已签到' }}
+                </div>
+              </el-tag>
+              <el-tag v-else type="danger" effect="plain" round>
+                <div class="flex gap-1 items-center">
+                  <el-icon class="mr-1">
+                    <CloseBold/>
+                  </el-icon>
+                  {{ row.siteType === 'online' ? '未访问' : '未签到' }}
+                </div>
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="150">
+          <template #default="{ row }">
+            <span v-if="tableModel.getRemark(row.name)">
+                {{ tableModel.getRemark(row.name) }}
+              </span>
           </template>
         </el-table-column>
         <el-table-column label="签到地址" prop="site">
@@ -128,22 +137,67 @@
 </template>
 
 <script setup>
-import {getCurrentInstance, nextTick, onMounted, reactive, computed, ref} from "vue";
+import {computed, nextTick, onMounted, reactive, ref} from "vue";
 import {useRoute} from "vue-router";
 import router from "../router/index.js";
 import {ElLoading, ElMessage} from "element-plus";
 import {VideoPlay, Refresh, InfoFilled, List, Check, Timer, Select, CloseBold, Link} from '@element-plus/icons-vue';
 import {handleSignTask} from "../utils/sign/index.js";
-import {addSignDate} from "../utils/storage/signDate.js";
+import {addSignDate, getSignRecords, updateSignResult} from "../utils/storage/signDate.js";
 import {storage} from '../utils/storage';
 import {sendIyuuNotice} from "../utils/iyuu/index.js";
 import {getSiteData} from "../utils/storage/siteData.js";
 import {getSettingData} from "../utils/storage/settingData.js";
-import {getDateString} from "../utils/index.js";
+import {getDateString, sleep} from "../utils/index.js";
 
 const route = useRoute();
-const {proxy} = getCurrentInstance();
 const tableRef = ref(null);
+const todayString = computed(() => getDateString());
+const STATUS_REMARK_MAP = {
+  'login-required': '需要重新登录',
+  'login-captcha': '登录页存在验证码',
+  'secondary-auth': '需要完成二级验证',
+  'site-unreachable': '无法访问站点或页面加载失败',
+  'site-error': '站点返回错误页面',
+  'cloudflare-timeout': 'Cloudflare 超时或防护异常',
+  'strategy-missing': '未配置签到策略',
+  'script-error': '页面脚本执行失败',
+  'task-error': '签到任务异常',
+  'failed': '未识别到签到成功结果',
+};
+
+function getSelectedSites() {
+  return tableRef.value?.getSelectionRows?.() ?? [];
+}
+
+function buildRecordMap(rawRecords) {
+  return rawRecords.reduce((map, item) => {
+    map[item.key] = item;
+    return map;
+  }, {});
+}
+
+async function refreshRecords() {
+  const rawRecords = await getSignRecords();
+  return buildRecordMap(rawRecords);
+}
+
+function getSignResultMessage(siteName, result) {
+  if (result?.msg) {
+    return result.msg;
+  }
+  return result?.sign ? `${siteName} 签到成功` : `${siteName} 签到失败`;
+}
+
+function getStatusRemark(result) {
+  if (!result) {
+    return '';
+  }
+  if (result.sign) {
+    return result.msg || '';
+  }
+  return result.msg || STATUS_REMARK_MAP[result.status] || '签到失败';
+}
 
 // 设置块
 const settingModel = reactive({
@@ -160,61 +214,56 @@ const tableModel = reactive({
   recordMap: {},
   loading: false,
 
-  // 计算属性：今日已签到数量
-  signedCount: computed(() => {
-    return tableModel.tableData.filter(row => tableModel.checkIsSignedToday(row.name)).length;
-  }),
+  signedCount: computed(() => tableModel.tableData.filter(row => tableModel.checkIsSignedToday(row.name)).length),
 
-  // 获取签到历史记录
   async fetchRecords() {
-    const rawRecords = await storage.get('site_sign_records', []);
-    const map = {};
-    rawRecords.forEach(item => {
-      map[item.key] = item.dates;
-    });
-    this.recordMap = map;
+    this.recordMap = await refreshRecords();
   },
 
-  // 初始化数据
   async init() {
     this.loading = true;
     try {
       await this.fetchRecords();
       const data = await getSiteData();
-      this.tableData = data.filter(x => x.enabled);
+      this.tableData = data.filter(item => item.enabled);
       this.autoSelectUnsigned();
     } finally {
       this.loading = false;
     }
   },
 
-  // 刷新
   async refreshData() {
     await this.init();
     ElMessage.success('数据已刷新哟～');
   },
 
-  // 检查今日是否已签到
-  checkIsSignedToday(siteName) {
-    // 获取本地日期的 YYYY-MM-DD 格式
-    const now = new Date();
-    const dayStr = getDateString(now);
-
-    const dates = this.recordMap[siteName];
-    return dates && dates.includes(dayStr);
+  getRecord(siteName) {
+    return this.recordMap[siteName] ?? null;
   },
 
-  // 自动勾选未签到
+  checkIsSignedToday(siteName) {
+    const record = this.getRecord(siteName);
+    const dates = record?.dates;
+    return Array.isArray(dates) && dates.includes(todayString.value);
+  },
+
+  getRemark(siteName) {
+    const record = this.getRecord(siteName);
+    return getStatusRemark(record?.lastResult);
+  },
+
   autoSelectUnsigned() {
     nextTick(() => {
-      if (proxy.$refs.tableRef && this.tableData.length > 0) {
-        proxy.$refs.tableRef.clearSelection();
-        this.tableData.forEach(row => {
-          if (!this.checkIsSignedToday(row.name)) {
-            proxy.$refs.tableRef.toggleRowSelection(row, true);
-          }
-        });
+      if (!tableRef.value || this.tableData.length === 0) {
+        return;
       }
+
+      tableRef.value.clearSelection();
+      this.tableData.forEach(row => {
+        if (!this.checkIsSignedToday(row.name)) {
+          tableRef.value.toggleRowSelection(row, true);
+        }
+      });
     });
   }
 });
@@ -223,7 +272,6 @@ const tableModel = reactive({
 const signModel = reactive({
   isBatchSigning: false,
 
-  // 单个签到
   async sign(site) {
     const loadingInstance = ElLoading.service({
       lock: true,
@@ -233,36 +281,33 @@ const signModel = reactive({
 
     try {
       const {success, msg} = await signModel.doSignLogic(site);
-
+      await tableModel.fetchRecords();
       if (success) {
         await sendIyuuNotice(`${site.name} 签到结果`, msg);
-        await tableModel.fetchRecords();
-        ElMessage.success(msg + '！');
-      } else {
-        ElMessage.warning(msg + '...');
+        ElMessage.success(`${msg}！`);
+        return;
       }
-    } catch (e) {
+
+      ElMessage.warning(`${msg}...`);
+    } catch {
       ElMessage.error(`${site.name} 发生异常`);
     } finally {
       loadingInstance.close();
     }
   },
 
-  // 批量签到
   async allSign(isAutoSign = false) {
-    const selectSite = proxy.$refs.tableRef.getSelectionRows();
-    if (selectSite.length === 0) {
+    const selectedSites = getSelectedSites();
+    if (selectedSites.length === 0) {
       ElMessage.warning('请先勾选需要签到的站点哟～');
       return;
     }
 
-    signModel.isBatchSigning = true;
+    this.isBatchSigning = true;
     const reportList = [];
-
-    // 最大重试次数，比如 1 代表执行一次后，如果有失败，再重试一次
     const maxRetries = 1;
     let currentTry = 0;
-    let pendingSites = [...selectSite];
+    let pendingSites = [...selectedSites];
 
     const loadingInstance = ElLoading.service({
       lock: true,
@@ -274,57 +319,67 @@ const signModel = reactive({
       while (currentTry <= maxRetries && pendingSites.length > 0) {
         if (currentTry > 0) {
           loadingInstance.setText(`正在进行第 ${currentTry} 次重试，剩余 ${pendingSites.length} 个站点...`);
-          // 稍微停顿一下，避免频繁请求
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await sleep(2000);
         }
 
-        const backgroundTasks = [];
-        const currentPassResults = [];
+        const backgroundSites = settingModel.allOpen
+          ? pendingSites.filter(site => !site.active)
+          : [];
+        const foregroundSites = settingModel.allOpen
+          ? pendingSites.filter(site => site.active)
+          : pendingSites;
+
+        const backgroundResults = [];
+        const backgroundLimit = 5;
+        let backgroundIndex = 0;
+        const backgroundWorkerCount = Math.min(backgroundLimit, backgroundSites.length);
+        const backgroundWorkers = Array.from({length: backgroundWorkerCount}, async () => {
+          while (backgroundIndex < backgroundSites.length) {
+            const site = backgroundSites[backgroundIndex++];
+            if (!site) {
+              return;
+            }
+            const res = await this.doSignLogic(site);
+            backgroundResults.push({site, res, background: true});
+          }
+        });
+        await Promise.all(backgroundWorkers);
+        const resultMap = new Map(backgroundResults.map(item => [item.site.name, item]));
+
+        for (const site of foregroundSites) {
+          const res = await this.doSignLogic(site);
+          resultMap.set(site.name, {site, res, background: false});
+        }
+
+        const currentPassResults = pendingSites
+          .map(site => resultMap.get(site.name))
+          .filter(Boolean);
+
+        const nonRetryStatuses = new Set(['login-required', 'login-captcha', 'secondary-auth']);
         const failedSites = [];
-
-        for (const site of pendingSites) {
-          const runInBackground = settingModel.allOpen && !site.active;
-          if (runInBackground) {
-            // 并发模式：直接把 Promise 塞进数组
-            const task = signModel.doSignLogic(site).then((res) => {
-              currentPassResults.push({site, res, background: true});
-            });
-            backgroundTasks.push(task);
-          } else {
-            // 顺序模式：等待结果
-            const res = await signModel.doSignLogic(site);
-            currentPassResults.push({site, res, background: false});
-          }
-        }
-
-        // 等待所有后台任务完成
-        if (backgroundTasks.length > 0) {
-          await Promise.all(backgroundTasks);
-        }
-
-        // 整理当前这一轮的执行结果
         for (const {site, res, background} of currentPassResults) {
+          const suffix = background ? ' (并发)' : '';
           if (res.success) {
-            reportList.push(res.msg + (background ? ' (并发)' : ''));
-          } else {
-            failedSites.push(site);
+            reportList.push(`[${site.name}] ${res.msg}${suffix}`);
+            continue;
           }
+
+          const status = res.result?.status ?? '';
+          if (nonRetryStatuses.has(status)) {
+            reportList.push(`[${site.name}] ${res.msg} (跳过重试)${suffix}`);
+            continue;
+          }
+
+          failedSites.push(site);
+          reportList.push(`[${site.name}] ${res.msg}${suffix}`);
         }
 
-        // 把失败的站点记录下来，留给下一次重试
         pendingSites = failedSites;
         currentTry++;
       }
 
-      // 如果重试完了仍然有失败的站点，在这里记录下来
-      for (const site of pendingSites) {
-        reportList.push(`${site.name} 最终签到失败`);
-      }
-
-      await sendIyuuNotice(`批量签到结果`, reportList.join('\n'));
+      await sendIyuuNotice('批量签到结果', reportList.join('\n'));
       await tableModel.fetchRecords();
-
-      // 任务彻底执行完毕后，页面会自动选中还未签到的站点
       tableModel.autoSelectUnsigned();
 
       if (pendingSites.length === 0) {
@@ -332,12 +387,10 @@ const signModel = reactive({
       } else {
         ElMessage.warning(`任务执行完毕，但仍有 ${pendingSites.length} 个站点失败，已被重新勾选。`);
       }
-
     } finally {
       loadingInstance.close();
-      signModel.isBatchSigning = false;
-      if (isAutoSign === true) {
-        // 如果是自动签到，则关闭窗口
+      this.isBatchSigning = false;
+      if (isAutoSign) {
         setTimeout(() => {
           window.close();
         }, 3000);
@@ -346,25 +399,41 @@ const signModel = reactive({
   },
 
   async doSignLogic(site) {
-    let resultData = {success: false, msg: ''};
     try {
-      const result = await handleSignTask(site);
+      const rawResult = await handleSignTask(site);
+      const result = {
+        sign: Boolean(rawResult?.sign),
+        pending: Boolean(rawResult?.pending),
+        status: rawResult?.status ?? 'task-error',
+        title: rawResult?.title ?? '',
+        text: rawResult?.text ?? '',
+        msg: rawResult?.msg ?? `${site.name} 返回空结果`,
+        detail: rawResult?.detail ?? rawResult?.text ?? '',
+      };
+
+      await updateSignResult(site.name, result);
       if (result.sign) {
-        const today = getDateString();
-        await addSignDate(site.name, today); // 只有成功才记录日期
-        resultData = {success: true, msg: `${site.name} 签到成功`};
-      } else {
-        resultData = {success: false, msg: `${site.name} 签到失败`};
+        await addSignDate(site.name, todayString.value);
+        return {success: true, msg: getSignResultMessage(site.name, result), result};
       }
-    } catch (e) {
-      console.error(e);
-      resultData = {success: false, msg: `${site.name} 执行出错`};
+      return {success: false, msg: getSignResultMessage(site.name, result), result};
+    } catch (error) {
+      console.error(error);
+      const fallbackResult = {
+        sign: false,
+        pending: false,
+        status: 'task-error',
+        title: '',
+        text: '',
+        msg: `${site.name} 执行出错`,
+        detail: error?.message ?? '',
+      };
+      await updateSignResult(site.name, fallbackResult);
+      return {success: false, msg: fallbackResult.msg, result: fallbackResult};
     }
-    return resultData;
   },
 });
 
-// 记录首次使用时间
 async function saveOnceUseTime() {
   const firstUseDate = await storage.get('first_use_date');
   if (!firstUseDate) {
@@ -379,7 +448,6 @@ onMounted(async () => {
   await tableModel.init();
   await settingModel.init();
 
-  // 处理自动签到指令
   if (route.query.action === 'autoSign') {
     setTimeout(() => {
       if (tableModel.tableData.length > 0) {

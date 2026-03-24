@@ -58,9 +58,44 @@
       <el-form label-width="220px">
         <el-form-item label="批量打开后台签到页">
           <div class="flex items-center gap-3">
-            <el-switch v-model="setting.allOpen" @change="saveSetting"/>
+            <el-switch v-model="setting.allOpen" @change="saveSetting" active-text="启用" inactive-text="禁用" inline-prompt/>
             <span class="text-gray-400 text-sm">
               启用后，签到时会一次性打开多个 <span class="text-red-400">关闭</span> "前台激活页面" 选项的页面
+            </span>
+          </div>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <!-- 调试设置 -->
+    <el-card shadow="hover" class="rounded-xl border-none">
+      <template #header>
+        <div class="card-header">
+          <span>签到调试设置</span>
+        </div>
+      </template>
+
+      <el-form label-width="220px">
+        <el-form-item label="启用签到调试模式">
+          <div class="flex items-center gap-3">
+            <el-switch v-model="setting.debugSignFlow" @change="saveSetting" active-text="启用" inactive-text="禁用" inline-prompt/>
+            <span class="text-gray-400 text-sm">
+              启用后，签到页会以前台方式打开，并在执行注入脚本前自动暂停，方便你手动打开 DevTools 排查
+            </span>
+          </div>
+        </el-form-item>
+
+        <el-form-item label="调试暂停时长">
+          <div class="flex items-center gap-3">
+            <el-input-number
+                v-model="setting.debugPauseMs"
+                :min="0"
+                :step="1000"
+                :controls="true"
+                @change="saveSetting"
+            />
+            <span class="text-gray-400 text-sm">
+              单位毫秒。建议设置为 10000 ~ 30000，默认 15000
             </span>
           </div>
         </el-form-item>
@@ -150,7 +185,6 @@ const timeOptions = [
   { label: '23:00', value: '23:00' },
 ];
 
-
 onMounted(async () => {
   setting.value = await getSettingData();
 });
@@ -162,4 +196,3 @@ onMounted(async () => {
   font-weight: 500;
 }
 </style>
-

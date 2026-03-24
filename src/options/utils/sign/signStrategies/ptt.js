@@ -1,20 +1,32 @@
 export function pttMain() {
-    let body = document.querySelector('body');
-    if (body?.innerText.includes('签到成功')) {
+    const body = document.querySelector('body');
+    const bodyText = body?.innerText ?? '';
+    if (bodyText.includes('签到成功')) {
         return {
             sign: true,
+            pending: false,
             title: '签到成功',
-            text: body.innerText
-        }
+            text: bodyText,
+            msg: '签到成功',
+            detail: bodyText,
+        };
     }
-    if (body?.innerText.includes('已签到')) {
+    if (bodyText.includes('已签到')) {
         return {
             sign: true,
+            pending: false,
             title: '已签到',
-            text: body.innerText
-        }
+            text: bodyText,
+            msg: '已签到',
+            detail: bodyText,
+        };
     }
     return {
-        sign: false
+        sign: false,
+        pending: false,
+        title: '',
+        text: bodyText,
+        msg: '未识别到 PTT 签到结果',
+        detail: bodyText,
     };
 }

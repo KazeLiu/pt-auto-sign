@@ -1,58 +1,76 @@
 export function PterMain() {
-    let attendanceWrap = document.getElementById('attendance-wrap');
-    if (attendanceWrap) {
-        if (attendanceWrap.innerText.includes('签到得猫粮')) {
-            let modalBtn = document.getElementById('do-attendance');
-            if (!modalBtn) {
-                console.error('找不到签到按钮！');
-                return {sign: false, error: '找不到签到按钮'};
-            }
-            modalBtn.click();
-        }
-        if (attendanceWrap.innerText.includes('签到已得')) {
-            return {
-                sign: true,
-                title: '已经打卡',
-                text: attendanceWrap.innerText
-            }
-        }
-    }
-
-
-    return new Promise((resolve) => {
-        const maxTime = 15000; // 最多等15秒，防止死循环
-        let spentTime = 0;
-
-        // 定义一个检查器
-        const intervalId = setInterval(() => {
-            spentTime += 500;
-            let title = document.querySelector('.jconfirm-title').innerText
-            let content = document.querySelector('.jconfirm-content').innerText
-
-            const isTargetPageLoaded = getSignInfo(title, content);
-            if (isTargetPageLoaded.sign) {
-                clearInterval(intervalId);
-                resolve(isTargetPageLoaded);
-            }
-
-            // 超时判断
-            if (spentTime >= maxTime) {
-                clearInterval(intervalId);
-                resolve(isTargetPageLoaded);
-            }
-        }, 500);
+    const createResult = ({
+        sign = false,
+        pending = false,
+        title = '',
+        text = '',
+        msg = '',
+        detail = '',
+    } = {}) => ({
+        sign,
+        pending,
+        title,
+        text,
+        msg: msg || title || text || (sign ? '签到成功' : '签到失败'),
+        detail: detail || text,
     });
 
-    function getSignInfo(title, content) {
-        if (title.includes('签到成功')) {
-            return {
-                sign: true,
-                title: '签到成功',
-                text: content
+    const waitForResult = ({interval = 500, timeout = 15000, check, onTimeout}) => new Promise((resolve) => {
+        let elapsed = 0;
+        const timer = setInterval(() => {
+            elapsed += interval;
+            const result = check();
+            if (result?.sign || result?.pending) {
+                clearInterval(timer);
+                resolve(result);
+                return;
             }
-        }
-        return {
-            sign: false
-        };
+
+            if (elapsed >= timeout) {
+                clearInterval(timer);
+                resolve(onTimeout ? onTimeout() : createResult({msg: '等待页面结果超时'}));
+            }
+        }, interval);
+    });
+
+    const attendanceWrap = document.getElementById('attendance-wrap');
+    const attendanceText = attendanceWrap?.innerText ?? '';
+
+    if (attendanceText.includes('签到已得')) {
+        return createResult({
+            sign: true,
+            title: '已经打卡',
+            text: attendanceText,
+        });
     }
+
+    if (attendanceText.includes('签到得猫粮')) {
+        const modalBtn = document.getElementById('do-attendance');
+        if (!modalBtn) {
+            return createResult({
+                msg: '找不到签到按钮',
+                text: attendanceText,
+            });
+        }
+        modalBtn.click();
+    }
+
+    return waitForResult({
+        check: () => {
+            const title = document.querySelector('.jconfirm-title')?.innerText ?? '';
+            const content = document.querySelector('.jconfirm-content')?.innerText ?? '';
+            if (title.includes('签到成功')) {
+                return createResult({
+                    sign: true,
+                    title: '签到成功',
+                    text: content || title,
+                });
+            }
+            return null;
+        },
+        onTimeout: () => createResult({
+            msg: 'Pter 签到弹窗等待超时',
+            text: document.querySelector('.jconfirm-content')?.innerText ?? attendanceText,
+        })
+    });
 }

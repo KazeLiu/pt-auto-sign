@@ -1,13 +1,14 @@
 /**
- * 签到流程核心调度器，负责页面准备、拦截态识别、脚本注入与结果归一化。
+ * 签到流程核心调度器：负责页面准备、拦截态识别、脚本注入与结果归一化。
  */
 
-import {createSignTab, closeTabSafe} from "../tab/tabManager.js";
 import browser from "webextension-polyfill";
+import {createSignTab, closeTabSafe} from "../tab/tabManager.js";
 import {sleep} from "../index.js";
 import {getSignStrategy} from "./signStrategies/index.js";
 import {getSettingData} from "../storage/settingData.js";
 
+// 页面/流程相关轮询与超时配置
 const PAGE_READY_POLL_INTERVAL = 500;
 const PAGE_READY_TIMEOUT = 30000;
 const VERIFY_POLL_INTERVAL = 1000;
@@ -15,6 +16,8 @@ const VERIFY_TIMEOUT = 20000;
 const SCRIPT_EXECUTE_DELAY = 1000;
 const BARRIER_POLL_INTERVAL = 1000;
 const BARRIER_TIMEOUT = 10000;
+
+// 关键字配置（页面识别使用）
 const VERIFY_KEYWORDS = [
     "Just a moment",
     "验证您是真人",
@@ -27,70 +30,70 @@ const VERIFY_KEYWORDS = [
     "Checking your browser"
 ];
 const LOGIN_FIELD_KEYWORDS = [
-    '用户名',
-    '用户名称',
-    '用戶名',
-    '账号',
-    '帳號',
-    'password',
-    '密码',
-    '密碼',
-    '验证码',
-    '驗證碼',
-    '验证图片',
-    '驗證圖片'
+    "用户名",
+    "用户名称",
+    "用戶名",
+    "账号",
+    "帳號",
+    "password",
+    "密码",
+    "密碼",
+    "验证码",
+    "驗證碼",
+    "验证图片",
+    "驗證圖片"
 ];
-const LOGIN_BUTTON_KEYWORDS = ['登录', '登錄', '登入', 'sign in', 'log in'];
+const LOGIN_BUTTON_KEYWORDS = ["登录", "登錄", "登入", "sign in", "log in"];
 const SITE_ERROR_KEYWORDS = [
-    '无法访问此网站',
-    '无法访问此网页',
-    '无法连接到',
-    'this site can\'t be reached',
-    'this site can’t be reached',
-    'err_',
-    'net::',
-    'dns_probe',
-    'connection refused',
-    '连接已重置',
-    '连接被重置'
+    "无法访问此网站",
+    "无法访问此网页",
+    "无法连接到",
+    "this site can't be reached",
+    "this site can’t be reached",
+    "err_",
+    "net::",
+    "dns_probe",
+    "connection refused",
+    "连接已重置",
+    "连接被重置"
 ];
 const SITE_STATUS_KEYWORDS = [
-    '404',
-    '403',
-    '500',
-    '502',
-    '503',
-    '504',
-    '520',
-    '521',
-    '522',
-    '523',
-    '524',
-    '525',
-    '526',
-    '527',
-    '530'
+    "404",
+    "403",
+    "500",
+    "502",
+    "503",
+    "504",
+    "520",
+    "521",
+    "522",
+    "523",
+    "524",
+    "525",
+    "526",
+    "527",
+    "530"
 ];
 const STATUS_HINT_KEYWORDS = [
-    'not found',
-    '找不到',
-    '页面不存在',
-    'bad gateway',
-    'gateway',
-    'service unavailable',
-    '超时',
-    'timeout'
+    "not found",
+    "找不到",
+    "页面不存在",
+    "bad gateway",
+    "gateway",
+    "service unavailable",
+    "超时",
+    "timeout"
 ];
 const CLOUDFLARE_TIMEOUT_KEYWORDS = [
-    'cloudflare',
-    'error 520',
-    'error 521',
-    'error 522',
-    'error 523',
-    'error 524',
-    'error 525',
-    'error 526',
-    'timeout'
+    "cloudflare",
+    "error 520",
+    "error 521",
+    "error 522",
+    "error 523",
+    "error 524",
+    "error 525",
+    "error 526",
+    "timeout"
 ];
 
 /**
@@ -107,7 +110,7 @@ async function getDebugConfig() {
 }
 
 /**
- * 在调试模式下暂停执行，方便手动打开 DevTools、查看页面结构或下断点。
+ * 在调试模式下暂停执行，便于手动打开 DevTools 进行排查。
  *
  * @param {number} tabId - 目标标签页 ID。
  * @param {string} phase - 当前调试阶段说明。
@@ -154,8 +157,8 @@ async function waitForPageInteractive(tabId, timeout = PAGE_READY_TIMEOUT) {
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {
         try {
-            const state = await executeInTab(tabId, () => document.readyState);
-            if (state === 'interactive' || state === 'complete') {
+            const readyState = await executeInTab(tabId, () => document.readyState);
+            if (readyState === "interactive" || readyState === "complete") {
                 return true;
             }
         } catch {
@@ -182,9 +185,9 @@ async function waitForVerifyPage(tabId, timeout = VERIFY_TIMEOUT) {
         try {
             await browser.tabs.get(tabId);
             const isShieldPresent = await executeInTab(tabId, (keywords) => {
-                const text = document.body?.innerText ?? '';
-                const title = document.title ?? '';
-                return keywords.some(keyword => text.includes(keyword) || title.includes(keyword));
+                const bodyText = document.body?.innerText ?? "";
+                const pageTitle = document.title ?? "";
+                return keywords.some(keyword => bodyText.includes(keyword) || pageTitle.includes(keyword));
             }, [VERIFY_KEYWORDS]);
 
             if (!isShieldPresent) {
@@ -213,15 +216,15 @@ async function waitForVerifyPage(tabId, timeout = VERIFY_TIMEOUT) {
 async function detectSiteError(tabId) {
     try {
         const result = await executeInTab(tabId, (config) => {
-            const title = (document.title ?? '').toLowerCase();
-            const bodyText = (document.body?.innerText ?? '').toLowerCase();
+            const title = (document.title ?? "").toLowerCase();
+            const bodyText = (document.body?.innerText ?? "").toLowerCase();
             const fullText = `${title}\n${bodyText}`;
             const hasKeyword = (keywords) => keywords.some(keyword => fullText.includes(keyword.toLowerCase()));
 
             if (hasKeyword(config.siteErrorKeywords)) {
                 return {
-                    status: 'site-unreachable',
-                    msg: '无法访问站点或网络错误',
+                    status: "site-unreachable",
+                    msg: "无法访问站点或网络错误",
                     detail: title || bodyText.slice(0, 200)
                 };
             }
@@ -229,7 +232,7 @@ async function detectSiteError(tabId) {
             const statusHit = config.siteStatusKeywords.find(code => fullText.includes(code));
             if (statusHit && hasKeyword(config.statusHintKeywords)) {
                 return {
-                    status: 'site-error',
+                    status: "site-error",
                     msg: `站点返回异常状态（${statusHit}）`,
                     detail: title || bodyText.slice(0, 200)
                 };
@@ -237,13 +240,13 @@ async function detectSiteError(tabId) {
 
             if (hasKeyword(config.cloudflareTimeoutKeywords)) {
                 return {
-                    status: 'cloudflare-timeout',
-                    msg: 'Cloudflare 超时或防护异常',
+                    status: "cloudflare-timeout",
+                    msg: "Cloudflare 超时或防护异常",
                     detail: title || bodyText.slice(0, 200)
                 };
             }
 
-            return {status: 'ready', msg: '', detail: ''};
+            return {status: "ready", msg: "", detail: ""};
         }, [{
             siteErrorKeywords: SITE_ERROR_KEYWORDS,
             siteStatusKeywords: SITE_STATUS_KEYWORDS,
@@ -252,16 +255,16 @@ async function detectSiteError(tabId) {
         }]);
         return result;
     } catch (error) {
-        const message = error?.message ?? '';
-        if (message.includes('Frame with ID 0 is showing error page')) {
+        const message = error?.message ?? "";
+        if (message.includes("Frame with ID 0 is showing error page")) {
             return {
-                status: 'site-unreachable',
-                msg: '无法访问站点或页面加载失败',
+                status: "site-unreachable",
+                msg: "无法访问站点或页面加载失败",
                 detail: message
             };
         }
         console.warn(`[Tab ${tabId}] 页面错误检测失败：`, message);
-        return {status: 'unknown', msg: message || '页面错误检测失败', detail: ''};
+        return {status: "unknown", msg: message || "页面错误检测失败", detail: ""};
     }
 }
 
@@ -275,39 +278,39 @@ async function detectPageBarrier(tabId) {
     try {
         console.log(`[Tab ${tabId}] 开始识别页面拦截态...`);
         const result = await executeInTab(tabId, (config) => {
-            const bodyText = (document.body?.innerText ?? '').toLowerCase();
-            const title = (document.title ?? '').toLowerCase();
-            const placeholderText = Array.from(document.querySelectorAll('input, textarea'))
-                .map(node => node.getAttribute('placeholder') || '')
-                .join('\n')
+            const bodyText = (document.body?.innerText ?? "").toLowerCase();
+            const title = (document.title ?? "").toLowerCase();
+            const placeholderText = Array.from(document.querySelectorAll("input, textarea"))
+                .map(node => node.getAttribute("placeholder") || "")
+                .join("\n")
                 .toLowerCase();
-            const inputMetaText = Array.from(document.querySelectorAll('input'))
+            const inputMetaText = Array.from(document.querySelectorAll("input"))
                 .map(node => [
-                    node.getAttribute('name') || '',
-                    node.getAttribute('id') || '',
-                    node.getAttribute('autocomplete') || ''
-                ].join(' '))
-                .join('\n')
+                    node.getAttribute("name") || "",
+                    node.getAttribute("id") || "",
+                    node.getAttribute("autocomplete") || ""
+                ].join(" "))
+                .join("\n")
                 .toLowerCase();
             const fullText = `${title}\n${bodyText}\n${placeholderText}\n${inputMetaText}`;
-            const forms = Array.from(document.querySelectorAll('form'));
+            const forms = Array.from(document.querySelectorAll("form"));
             const passwordInput = document.querySelector('input[type="password"]');
-            const visibleSubmitControls = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"]'))
-                .map(node => (node.innerText || node.value || '').trim().toLowerCase())
+            const visibleSubmitControls = Array.from(document.querySelectorAll("button, input[type=\"submit\"], input[type=\"button\"]"))
+                .map(node => (node.innerText || node.value || "").trim().toLowerCase())
                 .filter(Boolean);
 
             const hasKeyword = (keywords) => keywords.some(keyword => fullText.includes(keyword.toLowerCase()));
             const hasLoginButton = config.loginButtonKeywords.some(keyword =>
-                visibleSubmitControls.some(text => text.replace(/\s+/g, '').includes(keyword.replace(/\s+/g, '').toLowerCase()))
+                visibleSubmitControls.some(text => text.replace(/\s+/g, "").includes(keyword.replace(/\s+/g, "").toLowerCase()))
             );
             const hasLoginFieldKeyword = hasKeyword(config.loginFieldKeywords);
-            const hasVerificationKeyword = fullText.includes('验证码')
-                || fullText.includes('驗證碼')
-                || fullText.includes('验证图片')
-                || fullText.includes('驗證圖片');
+            const hasVerificationKeyword = fullText.includes("验证码")
+                || fullText.includes("驗證碼")
+                || fullText.includes("验证图片")
+                || fullText.includes("驗證圖片");
             const hasLoginFormLike = Boolean(passwordInput) || forms.length > 0;
 
-            console.log('[Barrier Detect] 页面识别特征：', {
+            console.log("[Barrier Detect] 页面识别特征：", {
                 title,
                 formsCount: forms.length,
                 hasPasswordInput: Boolean(passwordInput),
@@ -318,22 +321,21 @@ async function detectPageBarrier(tabId) {
                 hasLoginFormLike,
             });
 
-
             if ((hasLoginFormLike || hasLoginFieldKeyword) && hasLoginButton) {
-                const status = hasVerificationKeyword ? 'login-captcha' : 'login-required';
+                const status = hasVerificationKeyword ? "login-captcha" : "login-required";
                 console.log(`[Barrier Detect] 命中登录相关页面：${status}`);
                 return {
                     status,
-                    msg: hasVerificationKeyword ? '检测到登录验证码页面' : '检测到登录页面，可能已退出登录',
+                    msg: hasVerificationKeyword ? "检测到登录验证码页面" : "检测到登录页面，可能已退出登录",
                     detail: title || bodyText.slice(0, 200)
                 };
             }
 
-            console.log('[Barrier Detect] 未识别到页面拦截态，页面可继续签到');
+            console.log("[Barrier Detect] 未识别到页面拦截态，页面可继续签到");
             return {
-                status: 'ready',
-                msg: '',
-                detail: ''
+                status: "ready",
+                msg: "",
+                detail: ""
             };
         }, [{
             loginFieldKeywords: LOGIN_FIELD_KEYWORDS,
@@ -343,9 +345,9 @@ async function detectPageBarrier(tabId) {
     } catch (error) {
         console.warn(`[Tab ${tabId}] 页面拦截态识别失败：`, error?.message);
         return {
-            status: 'unknown',
-            msg: error?.message ?? '页面状态识别失败',
-            detail: ''
+            status: "unknown",
+            msg: error?.message ?? "页面状态识别失败",
+            detail: ""
         };
     }
 }
@@ -368,9 +370,9 @@ async function waitForBarrierDomReady(tabId, timeout = BARRIER_TIMEOUT) {
                 const body = document.body;
                 const textLen = body?.innerText?.length ?? 0;
                 const hasLoginDom = Boolean(
-                    document.querySelector('form')
+                    document.querySelector("form")
                     || document.querySelector('input[type="password"]')
-                    || document.querySelector('input[name], input[id], input[placeholder]')
+                    || document.querySelector("input[name], input[id], input[placeholder]")
                 );
                 return {
                     readyState: document.readyState,
@@ -384,7 +386,7 @@ async function waitForBarrierDomReady(tabId, timeout = BARRIER_TIMEOUT) {
                 return true;
             }
 
-            if (snapshot?.readyState === 'complete' && snapshot?.hasBody) {
+            if (snapshot?.readyState === "complete" && snapshot?.hasBody) {
                 if (Math.abs((snapshot?.textLen ?? 0) - lastTextLen) <= 5) {
                     stableCount += 1;
                 } else {
@@ -406,7 +408,7 @@ async function waitForBarrierDomReady(tabId, timeout = BARRIER_TIMEOUT) {
 }
 
 /**
- * 在页面可交互后继续等待一段时间，给前端异步渲染登录框、二级验证组件留出时间。
+ * 在页面可交互后继续等待一段时间，给异步渲染登录框/二级验证组件留出时间。
  *
  * @param {number} tabId - 目标标签页 ID。
  * @returns {Promise<{status: string, msg: string, detail: string}>} 页面状态识别结果。
@@ -420,14 +422,14 @@ async function waitForPageBarrier(tabId) {
         const result = await detectPageBarrier(tabId);
         console.log(`[Tab ${tabId}] 页面拦截态检测结果：`, result);
 
-        if (result.status !== 'ready') {
+        if (result.status !== "ready") {
             console.log(`[Tab ${tabId}] 检测到页面拦截态：${result.status}，停止等待。`);
         }
 
         return result;
     } catch (err) {
         console.warn(`[Tab ${tabId}] 检测页面拦截态时出错 (可能是页面跳转中):`, err?.message);
-        return {status: 'unknown', msg: err?.message ?? '页面拦截态识别失败', detail: ''};
+        return {status: "unknown", msg: err?.message ?? "页面拦截态识别失败", detail: ""};
     }
 }
 
@@ -442,21 +444,21 @@ async function runSignScript(tabId, siteInfo) {
     const strategy = getSignStrategy(siteInfo.siteType);
     if (!strategy) {
         console.warn(`[${siteInfo.name} 签到流程] 未找到策略：${siteInfo.siteType}`);
-        return {sign: false, pending: false, status: 'strategy-missing', msg: `未找到策略：${siteInfo.siteType}`};
+        return {sign: false, pending: false, status: "strategy-missing", msg: `未找到策略：${siteInfo.siteType}`};
     }
 
     try {
-        await pauseForDebug(tabId, '页面已打开，准备执行签到脚本', siteInfo.name);
+        await pauseForDebug(tabId, "页面已打开，准备执行签到脚本", siteInfo.name);
         await sleep(SCRIPT_EXECUTE_DELAY);
-        const result = await executeInTab(tabId, strategy) ?? {sign: false, pending: false, msg: '策略未返回结果'};
+        const result = await executeInTab(tabId, strategy) ?? {sign: false, pending: false, msg: "策略未返回结果"};
         const normalizedResult = {
             sign: Boolean(result?.sign),
             pending: Boolean(result?.pending),
-            status: result?.status ?? (result?.sign ? 'signed' : 'failed'),
-            title: result?.title ?? '',
-            text: result?.text ?? '',
-            msg: result?.msg ?? '',
-            detail: result?.detail ?? result?.text ?? '',
+            status: result?.status ?? (result?.sign ? "signed" : "failed"),
+            title: result?.title ?? "",
+            text: result?.text ?? "",
+            msg: result?.msg ?? "",
+            detail: result?.detail ?? result?.text ?? "",
         };
 
         console.log(`[${siteInfo.name} 签到流程] 执行结果：`, normalizedResult);
@@ -468,7 +470,7 @@ async function runSignScript(tabId, siteInfo) {
         return normalizedResult;
     } catch (err) {
         console.error(`[${siteInfo.name} 签到流程] 执行失败：`, err);
-        return {sign: false, pending: false, status: 'script-error', msg: err?.message ?? '执行脚本失败'};
+        return {sign: false, pending: false, status: "script-error", msg: err?.message ?? "执行脚本失败"};
     }
 }
 
@@ -482,7 +484,7 @@ async function runSignScript(tabId, siteInfo) {
 async function waitUntilSignable(tabId, skipVerifyPage) {
     await waitForPageInteractive(tabId);
     const siteError = await detectSiteError(tabId);
-    if (siteError.status !== 'ready' && siteError.status !== 'unknown') {
+    if (siteError.status !== "ready" && siteError.status !== "unknown") {
         return siteError;
     }
     if (!skipVerifyPage) {
@@ -508,16 +510,16 @@ async function waitUntilSignable(tabId, skipVerifyPage) {
  */
 export async function handleSignTask(siteInfo) {
     const debugConfig = await getDebugConfig();
-    const options = siteInfo.active || debugConfig.debugSignFlow
+    const tabOptions = siteInfo.active || debugConfig.debugSignFlow
         ? {active: true}
         : {active: false, pinned: true};
-    const tab = await createSignTab(siteInfo.site, options);
-    let finalResult = {sign: false, pending: false, status: 'task-error', msg: `${siteInfo.name} 返回空结果`};
+    const tab = await createSignTab(siteInfo.site, tabOptions);
+    let finalResult = {sign: false, pending: false, status: "task-error", msg: `${siteInfo.name} 返回空结果`};
 
     try {
         console.log(`[${siteInfo.name} 签到流程] 开始 ${siteInfo.name}`);
         let pageBarrier = await waitUntilSignable(tab.id, siteInfo.notVerifyPage);
-        if (pageBarrier.status !== 'ready' && pageBarrier.status !== 'unknown') {
+        if (pageBarrier.status !== "ready" && pageBarrier.status !== "unknown") {
             finalResult = {
                 sign: false,
                 pending: false,
@@ -531,7 +533,8 @@ export async function handleSignTask(siteInfo) {
         let result = await runSignScript(tab.id, siteInfo);
 
         if (result.pending) {
-            if (result.status === 'login-required' || result.status === 'login-captcha') {
+            const shouldSkipRetry = result.status === "login-required" || result.status === "login-captcha";
+            if (shouldSkipRetry) {
                 console.log(`[${siteInfo.name}] 检测到登录失败/验证码拦截，跳过二次重试。`);
                 finalResult = {
                     ...result,
@@ -551,7 +554,7 @@ export async function handleSignTask(siteInfo) {
 
             console.log(`[${siteInfo.name}] 检测到 Pending 状态，等待页面刷新...`);
             pageBarrier = await waitUntilSignable(tab.id, siteInfo.notVerifyPage);
-            if (pageBarrier.status !== 'ready' && pageBarrier.status !== 'unknown') {
+            if (pageBarrier.status !== "ready" && pageBarrier.status !== "unknown") {
                 finalResult = {
                     sign: false,
                     pending: false,
@@ -568,7 +571,7 @@ export async function handleSignTask(siteInfo) {
         return finalResult;
     } catch (err) {
         console.error(`[${siteInfo.name} 签到流程] 异常：`, err);
-        finalResult = {sign: false, pending: false, status: 'task-error', msg: err?.message};
+        finalResult = {sign: false, pending: false, status: "task-error", msg: err?.message};
         return finalResult;
     } finally {
         if (!debugConfig.debugSignFlow) {

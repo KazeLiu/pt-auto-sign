@@ -141,10 +141,10 @@ import {computed, nextTick, onMounted, reactive, ref} from "vue";
 import {useRoute} from "vue-router";
 import router from "../router/index.js";
 import {ElLoading, ElMessage} from "element-plus";
-import {VideoPlay, Refresh, InfoFilled, List, Check, Timer, Select, CloseBold, Link} from '@element-plus/icons-vue';
+import {VideoPlay, Refresh, InfoFilled, List, Check, Timer, Select, CloseBold, Link} from "@element-plus/icons-vue";
 import {handleSignTask} from "../utils/sign/index.js";
 import {addSignDate, getSignRecords, updateSignResult} from "../utils/storage/signDate.js";
-import {storage} from '../utils/storage';
+import {storage} from "../utils/storage";
 import {sendIyuuNotice} from "../utils/iyuu/index.js";
 import {getSiteData} from "../utils/storage/siteData.js";
 import {getSettingData} from "../utils/storage/settingData.js";
@@ -153,50 +153,47 @@ import {getDateString, sleep} from "../utils/index.js";
 const route = useRoute();
 const tableRef = ref(null);
 const todayString = computed(() => getDateString());
-const STATUS_REMARK_MAP = {
-  'login-required': '需要重新登录',
-  'login-captcha': '登录页存在验证码',
-  'secondary-auth': '需要完成二级验证',
-  'site-unreachable': '无法访问站点或页面加载失败',
-  'site-error': '站点返回错误页面',
-  'cloudflare-timeout': 'Cloudflare 超时或防护异常',
-  'strategy-missing': '未配置签到策略',
-  'script-error': '页面脚本执行失败',
-  'task-error': '签到任务异常',
-  'failed': '未识别到签到成功结果',
+const STATUS_REMARKS = {
+  "login-required": "需要重新登录",
+  "login-captcha": "登录页存在验证码",
+  "secondary-auth": "需要完成二级验证",
+  "site-unreachable": "无法访问站点或页面加载失败",
+  "site-error": "站点返回错误页面",
+  "cloudflare-timeout": "Cloudflare 超时或防护异常",
+  "strategy-missing": "未配置签到策略",
+  "script-error": "页面脚本执行失败",
+  "task-error": "签到任务异常",
+  "failed": "未识别到签到成功结果",
 };
 
 function getSelectedSites() {
   return tableRef.value?.getSelectionRows?.() ?? [];
 }
 
-function buildRecordMap(rawRecords) {
-  return rawRecords.reduce((map, item) => {
-    map[item.key] = item;
+function buildRecordMap(records) {
+  return records.reduce((map, record) => {
+    map[record.key] = record;
     return map;
   }, {});
 }
 
 async function refreshRecords() {
-  const rawRecords = await getSignRecords();
-  return buildRecordMap(rawRecords);
+  const records = await getSignRecords();
+  return buildRecordMap(records);
 }
 
 function getSignResultMessage(siteName, result) {
-  if (result?.msg) {
-    return result.msg;
-  }
-  return result?.sign ? `${siteName} 签到成功` : `${siteName} 签到失败`;
+  return result?.msg ?? (result?.sign ? `${siteName} 签到成功` : `${siteName} 签到失败`);
 }
 
 function getStatusRemark(result) {
   if (!result) {
-    return '';
+    return "";
   }
   if (result.sign) {
-    return result.msg || '';
+    return result.msg || "";
   }
-  return result.msg || STATUS_REMARK_MAP[result.status] || '签到失败';
+  return result.msg || STATUS_REMARKS[result.status] || "签到失败";
 }
 
 // 设置块
@@ -234,7 +231,7 @@ const tableModel = reactive({
 
   async refreshData() {
     await this.init();
-    ElMessage.success('数据已刷新哟～');
+    ElMessage.success("数据已刷新哟～");
   },
 
   getRecord(siteName) {
@@ -276,7 +273,7 @@ const signModel = reactive({
     const loadingInstance = ElLoading.service({
       lock: true,
       text: `正在给 ${site.name} 签到中...`,
-      background: 'rgba(255, 255, 255, 0.8)',
+      background: "rgba(255, 255, 255, 0.8)",
     });
 
     try {
@@ -299,7 +296,7 @@ const signModel = reactive({
   async allSign(isAutoSign = false) {
     const selectedSites = getSelectedSites();
     if (selectedSites.length === 0) {
-      ElMessage.warning('请先勾选需要签到的站点哟～');
+      ElMessage.warning("请先勾选需要签到的站点哟～");
       return;
     }
 
@@ -312,7 +309,7 @@ const signModel = reactive({
     const loadingInstance = ElLoading.service({
       lock: true,
       text: `正在批量执行 ${pendingSites.length} 个任务，请稍候...`,
-      background: 'rgba(255, 255, 255, 0.9)',
+      background: "rgba(255, 255, 255, 0.9)",
     });
 
     try {
@@ -355,16 +352,16 @@ const signModel = reactive({
           .map(site => resultMap.get(site.name))
           .filter(Boolean);
 
-        const nonRetryStatuses = new Set(['login-required', 'login-captcha', 'secondary-auth']);
+        const nonRetryStatuses = new Set(["login-required", "login-captcha", "secondary-auth"]);
         const failedSites = [];
         for (const {site, res, background} of currentPassResults) {
-          const suffix = background ? ' (并发)' : '';
+          const suffix = background ? " (并发)" : "";
           if (res.success) {
             reportList.push(`[${site.name}] ${res.msg}${suffix}`);
             continue;
           }
 
-          const status = res.result?.status ?? '';
+          const status = res.result?.status ?? "";
           if (nonRetryStatuses.has(status)) {
             reportList.push(`[${site.name}] ${res.msg} (跳过重试)${suffix}`);
             continue;
@@ -378,12 +375,12 @@ const signModel = reactive({
         currentTry++;
       }
 
-      await sendIyuuNotice('批量签到结果', reportList.join('\n'));
+      await sendIyuuNotice("批量签到结果", reportList.join("\n"));
       await tableModel.fetchRecords();
       tableModel.autoSelectUnsigned();
 
       if (pendingSites.length === 0) {
-        ElMessage.success('批量任务全部执行完毕哟！✨');
+        ElMessage.success("批量任务全部执行完毕哟！✨");
       } else {
         ElMessage.warning(`任务执行完毕，但仍有 ${pendingSites.length} 个站点失败，已被重新勾选。`);
       }
@@ -404,11 +401,11 @@ const signModel = reactive({
       const result = {
         sign: Boolean(rawResult?.sign),
         pending: Boolean(rawResult?.pending),
-        status: rawResult?.status ?? 'task-error',
-        title: rawResult?.title ?? '',
-        text: rawResult?.text ?? '',
+        status: rawResult?.status ?? "task-error",
+        title: rawResult?.title ?? "",
+        text: rawResult?.text ?? "",
         msg: rawResult?.msg ?? `${site.name} 返回空结果`,
-        detail: rawResult?.detail ?? rawResult?.text ?? '',
+        detail: rawResult?.detail ?? rawResult?.text ?? "",
       };
 
       await updateSignResult(site.name, result);
@@ -422,11 +419,11 @@ const signModel = reactive({
       const fallbackResult = {
         sign: false,
         pending: false,
-        status: 'task-error',
-        title: '',
-        text: '',
+        status: "task-error",
+        title: "",
+        text: "",
         msg: `${site.name} 执行出错`,
-        detail: error?.message ?? '',
+        detail: error?.message ?? "",
       };
       await updateSignResult(site.name, fallbackResult);
       return {success: false, msg: fallbackResult.msg, result: fallbackResult};
@@ -435,11 +432,11 @@ const signModel = reactive({
 });
 
 async function saveOnceUseTime() {
-  const firstUseDate = await storage.get('first_use_date');
+  const firstUseDate = await storage.get("first_use_date");
   if (!firstUseDate) {
     const now = new Date().toLocaleString();
-    await storage.set('first_use_date', now);
-    console.log('欢迎新用户！首次使用时间已记录:', now);
+    await storage.set("first_use_date", now);
+    console.log("欢迎新用户！首次使用时间已记录:", now);
   }
 }
 
@@ -448,7 +445,7 @@ onMounted(async () => {
   await tableModel.init();
   await settingModel.init();
 
-  if (route.query.action === 'autoSign') {
+  if (route.query.action === "autoSign") {
     setTimeout(() => {
       if (tableModel.tableData.length > 0) {
         signModel.allSign(true);

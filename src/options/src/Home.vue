@@ -183,7 +183,20 @@ async function refreshRecords() {
 }
 
 function getSignResultMessage(siteName, result) {
-  return result?.msg ?? (result?.sign ? `${siteName} 签到成功` : `${siteName} 签到失败`);
+  if (!result) {
+    return `${siteName} 签到失败`;
+  }
+  const base = result.msg || (result.sign ? "签到成功" : "签到失败");
+  if (base.includes(siteName)) {
+    return base;
+  }
+  return `${siteName}：${base}`;
+}
+
+function getBatchSignResultMessage(siteName, result) {
+  // 批量推送需要稳定携带站点名称，避免当结果文案为空或未包含站点名时丢失来源信息
+  const baseMessage = result?.msg || (result?.sign ? "签到成功" : "签到失败");
+  return `[${siteName}] ${baseMessage}`;
 }
 
 function getStatusRemark(result) {
@@ -356,19 +369,20 @@ const signModel = reactive({
         const failedSites = [];
         for (const {site, res, background} of currentPassResults) {
           const suffix = background ? " (并发)" : "";
+          const msgWithSite = `${getBatchSignResultMessage(site.name, res.result)}${suffix}`;
           if (res.success) {
-            reportList.push(`[${site.name}] ${res.msg}${suffix}`);
+            reportList.push(msgWithSite);
             continue;
           }
 
           const status = res.result?.status ?? "";
           if (nonRetryStatuses.has(status)) {
-            reportList.push(`[${site.name}] ${res.msg} (跳过重试)${suffix}`);
+            reportList.push(`${msgWithSite} (跳过重试)${suffix}`);
             continue;
           }
 
           failedSites.push(site);
-          reportList.push(`[${site.name}] ${res.msg}${suffix}`);
+          reportList.push(`${msgWithSite}${suffix}`);
         }
 
         pendingSites = failedSites;

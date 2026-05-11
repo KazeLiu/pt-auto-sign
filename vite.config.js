@@ -25,6 +25,7 @@ export default defineConfig({
             manifest: generateManifest,
             watchFilePaths: ["package.json", "manifest.json"],
             browser: process.env.TARGET || "chrome",
+            disableAutoLaunch: true,
         }),
     ],
     build: {

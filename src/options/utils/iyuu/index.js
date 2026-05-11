@@ -22,18 +22,37 @@ export const sendIyuuNotice = async (text, desp = '') => {
                 }),
             });
 
-            const result = await response.json();
-
-            if (result.errcode === 0) {
-                return result;
-            } else {
-                console.error('发送出错了：', result.errmsg);
+            const responseText = await response.text();
+            let result = {
+                errcode: response.ok ? 0 : response.status,
+                errmsg: response.ok ? '' : response.statusText,
+            };
+            if (responseText.trim()) {
+                try {
+                    result = JSON.parse(responseText);
+                } catch (error) {
+                    result = {
+                        errcode: -1,
+                        errmsg: '推送接口返回非 JSON 响应',
+                        detail: error?.message ?? '',
+                    };
+                }
             }
+
+            if (response.ok && result.errcode === 0) {
+                return result;
+            }
+
+            console.error('发送出错了：', result.errmsg || response.statusText || result);
+            return result;
         } catch (error) {
             console.error('网络请求错误：', error);
-            throw error;
+            return {
+                errcode: -1,
+                errmsg: error?.message ?? '网络请求错误',
+            };
         }
-    }else{
-
     }
+
+    return null;
 };

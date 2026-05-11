@@ -1,4 +1,5 @@
 import { storage } from './index';
+import { getDateString } from '../index.js';
 
 const STORAGE_KEY = 'site_sign_records';
 
@@ -12,8 +13,34 @@ function createEmptyRecord(siteKey) {
     return {
         key: siteKey,
         dates: [],
+        dailyResults: {},
         lastResult: null,
         lastUpdate: Date.now()
+    };
+}
+
+function getRecordDates(record) {
+    return Array.isArray(record?.dates) ? record.dates : [];
+}
+
+function getRecordDailyResults(record) {
+    if (!record?.dailyResults || typeof record.dailyResults !== 'object' || Array.isArray(record.dailyResults)) {
+        return {};
+    }
+    return record.dailyResults;
+}
+
+function normalizeSignResult(result = {}, dateStr = getDateString()) {
+    return {
+        sign: Boolean(result?.sign),
+        pending: Boolean(result?.pending),
+        status: result?.status ?? (result?.sign ? 'signed' : 'failed'),
+        msg: result?.msg ?? '',
+        title: result?.title ?? '',
+        text: result?.text ?? '',
+        detail: result?.detail ?? result?.text ?? '',
+        date: dateStr,
+        updatedAt: Date.now()
     };
 }
 
@@ -33,14 +60,41 @@ export async function addSignDate(siteKey, dateStr) {
         () => ({
             ...createEmptyRecord(siteKey),
             dates: [dateStr],
+            dailyResults: {
+                [dateStr]: normalizeSignResult({
+                    sign: true,
+                    status: 'signed',
+                    msg: '签到成功'
+                }, dateStr)
+            },
         }),
-        old => ({
-            ...old,
-            dates: old.dates.includes(dateStr)
-                ? old.dates
-                : [...old.dates, dateStr],
-            lastUpdate: Date.now()
-        })
+        old => {
+            const dates = getRecordDates(old);
+            const dailyResults = getRecordDailyResults(old);
+            const existingResult = dailyResults[dateStr] ?? old.lastResult ?? {};
+            const signedResult = normalizeSignResult({
+                ...existingResult,
+                sign: true,
+                pending: false,
+                status: existingResult.status && existingResult.status !== 'failed'
+                    ? existingResult.status
+                    : 'signed',
+                msg: existingResult.msg || '签到成功'
+            }, dateStr);
+
+            return {
+                ...old,
+                dates: dates.includes(dateStr)
+                    ? dates
+                    : [...dates, dateStr],
+                dailyResults: {
+                    ...dailyResults,
+                    [dateStr]: signedResult
+                },
+                lastResult: signedResult,
+                lastUpdate: Date.now()
+            };
+        }
     );
     console.log(`签到记录更新成功`, list);
 }
@@ -62,31 +116,38 @@ export async function addSignDate(siteKey, dateStr) {
  * }} [result={}] - 原始签到结果。
  * @returns {Promise<void>}
  */
-export async function updateSignResult(siteKey, result = {}) {
-    const normalizedResult = {
-        sign: Boolean(result?.sign),
-        pending: Boolean(result?.pending),
-        status: result?.status ?? (result?.sign ? 'signed' : 'failed'),
-        msg: result?.msg ?? '',
-        title: result?.title ?? '',
-        text: result?.text ?? '',
-        detail: result?.detail ?? result?.text ?? '',
-        updatedAt: Date.now()
-    };
+export async function updateSignResult(siteKey, result = {}, dateStr = getDateString()) {
+    const normalizedResult = normalizeSignResult(result, dateStr);
 
     const list = await storage.listUpsert(
         STORAGE_KEY,
         item => item.key === siteKey,
         () => ({
             ...createEmptyRecord(siteKey),
+            dates: normalizedResult.sign ? [dateStr] : [],
+            dailyResults: {
+                [dateStr]: normalizedResult
+            },
             lastResult: normalizedResult,
             lastUpdate: Date.now()
         }),
-        old => ({
-            ...old,
-            lastResult: normalizedResult,
-            lastUpdate: Date.now()
-        })
+        old => {
+            const dates = getRecordDates(old);
+            const dailyResults = getRecordDailyResults(old);
+
+            return {
+                ...old,
+                dates: normalizedResult.sign && !dates.includes(dateStr)
+                    ? [...dates, dateStr]
+                    : dates,
+                dailyResults: {
+                    ...dailyResults,
+                    [dateStr]: normalizedResult
+                },
+                lastResult: normalizedResult,
+                lastUpdate: Date.now()
+            };
+        }
     );
 
     console.log(`签到结果更新成功`, list);

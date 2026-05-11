@@ -156,10 +156,12 @@ const todayString = computed(() => getDateString());
 const STATUS_REMARKS = {
   "login-required": "需要重新登录",
   "login-captcha": "登录页存在验证码",
+  "login-2fa": "需要完成二级验证",
   "secondary-auth": "需要完成二级验证",
   "site-unreachable": "无法访问站点或页面加载失败",
   "site-error": "站点返回错误页面",
   "cloudflare-timeout": "Cloudflare 超时或防护异常",
+  "invalid-site-url": "签到地址格式不正确",
   "strategy-missing": "未配置签到策略",
   "script-error": "页面脚本执行失败",
   "task-error": "签到任务异常",
@@ -365,7 +367,7 @@ const signModel = reactive({
           .map(site => resultMap.get(site.name))
           .filter(Boolean);
 
-        const nonRetryStatuses = new Set(["login-required", "login-captcha", "secondary-auth"]);
+        const nonRetryStatuses = new Set(["login-required", "login-captcha", "login-2fa", "secondary-auth"]);
         const failedSites = [];
         for (const {site, res, background} of currentPassResults) {
           const suffix = background ? " (并发)" : "";

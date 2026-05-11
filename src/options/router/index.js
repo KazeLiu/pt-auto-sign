@@ -2,6 +2,7 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 
 // 注意这里的路径：.. 代表回到 options 目录，然后进入 src 目录找组件
 import Home from '../src/Home.vue';
+import History from '../src/History.vue';
 import SiteSetting from '../src/SiteSetting.vue';
 import Setting from '../src/Setting.vue';
 
@@ -15,6 +16,12 @@ const routes = [
         component: Home,
         name: 'Home',
         meta: { title: '概览' }
+    },
+    {
+        path: '/History',
+        component: History,
+        name: 'History',
+        meta: { title: '历史记录' }
     },
     {
         path: '/SiteSetting',

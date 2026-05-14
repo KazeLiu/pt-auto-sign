@@ -1,5 +1,19 @@
 import browser from "webextension-polyfill";
 
+function cloneForStorage(value) {
+    try {
+        return structuredClone(value);
+    } catch (error) {
+        return JSON.parse(JSON.stringify(value));
+    }
+}
+
+function normalizeStorageData(data) {
+    return Object.fromEntries(
+        Object.entries(data).map(([key, value]) => [key, cloneForStorage(value)])
+    );
+}
+
 /**
  * 浏览器存储操作助手。
  *
@@ -52,11 +66,12 @@ class StorageHelper {
     async set(key, value) {
         try {
             const data = typeof key === 'object' && key !== null
-                ? key
-                : {[key]: structuredClone(value)};
+                ? normalizeStorageData(key)
+                : {[key]: cloneForStorage(value)};
             await this.storageArea.set(data);
         } catch (error) {
             console.error('[Storage] 保存失败:', error);
+            throw error;
         }
     }
 

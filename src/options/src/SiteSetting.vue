@@ -295,8 +295,11 @@ const actions = {
   // 保存所有数据
   saveAllData: async () => {
     appState.saving = true;
-    await setSiteData(appState.list);
-    appState.saving = false;
+    try {
+      await setSiteData(appState.list);
+    } finally {
+      appState.saving = false;
+    }
   },
 
   // 打开新增窗口
@@ -344,24 +347,30 @@ const actions = {
   },
 
   // 提交表单
-  submitForm: () => {
+  submitForm: async () => {
     if (!formModel.name || !formModel.site) {
       ElMessage.warning('名字和地址不能为空');
       return;
     }
 
     const newItem = {...formModel};
+    const previousList = appState.list.slice();
 
     if (dialogState.isEdit) {
-      appState.list[dialogState.editIndex] = newItem;
-      ElMessage.success(`已更新 ${newItem.name}`);
+      appState.list.splice(dialogState.editIndex, 1, newItem);
     } else {
       appState.list.push(newItem);
-      ElMessage.success(`已添加 ${newItem.name}`);
     }
 
-    dialogState.visible = false;
-    actions.saveAllData();
+    try {
+      await actions.saveAllData();
+      dialogState.visible = false;
+      ElMessage.success(dialogState.isEdit ? `已更新 ${newItem.name}` : `已添加 ${newItem.name}`);
+    } catch (error) {
+      appState.list = previousList;
+      ElMessage.error('保存失败，请打开控制台查看错误');
+      console.error('[站点列表] 保存失败:', error);
+    }
   },
 
   // 删除站点
@@ -370,10 +379,17 @@ const actions = {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning',
-    }).then(() => {
+    }).then(async () => {
+      const previousList = appState.list.slice();
       appState.list.splice(index, 1);
-      actions.saveAllData();
-      ElMessage.info('已删除');
+      try {
+        await actions.saveAllData();
+        ElMessage.info('已删除');
+      } catch (error) {
+        appState.list = previousList;
+        ElMessage.error('删除失败，请打开控制台查看错误');
+        console.error('[站点列表] 删除失败:', error);
+      }
     }).catch(() => {
     });
   },
@@ -426,9 +442,15 @@ const actions = {
                   siteType: "nexusPHP",
                   ...item
                 }));
-                actions.saveAllData();
-                console.log(`[站点列表] 站点数据已覆盖，共 ${appState.list.length} 个`);
-                ElMessage.success(`导入成功！现有列表已被 ${appState.list.length} 个新站点覆盖`);
+                actions.saveAllData()
+                    .then(() => {
+                      console.log(`[站点列表] 站点数据已覆盖，共 ${appState.list.length} 个`);
+                      ElMessage.success(`导入成功！现有列表已被 ${appState.list.length} 个新站点覆盖`);
+                    })
+                    .catch(error => {
+                      ElMessage.error('导入保存失败，请打开控制台查看错误');
+                      console.error('[站点列表] 导入保存失败:', error);
+                    });
               } else {
                 ElMessage.error('文件格式不对，需要 JSON 数组格式');
               }

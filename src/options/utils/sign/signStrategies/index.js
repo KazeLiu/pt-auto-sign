@@ -8,6 +8,7 @@ import {onlineMian} from "./online.js";
 import {pttMain} from "./ptt.js";
 import {PterMain} from "./PTer.js";
 import {RousiMain} from "./Rousi.js";
+import {ssdMain} from "./ssd.js";
 
 const STRATEGY_MAP = {
     HANHAN: hanhanMain,
@@ -18,6 +19,7 @@ const STRATEGY_MAP = {
     PTT: pttMain,
     PTER: PterMain,
     ROUSI: RousiMain,
+    SSD: ssdMain,
     online: onlineMian,
 };
 

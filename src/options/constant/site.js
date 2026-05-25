@@ -9,6 +9,7 @@ export const SITE_TYPES = Object.freeze({
     PTT: 'PTT',
     PTER: "PTER",
     ROUSI: "ROUSI",
+    SSD: "SSD",
     ONLINE: 'online',
     nexusPHP: 'nexusPHP'
 });
@@ -29,6 +30,12 @@ export const SITE_LIST = [
 
     // --- 标准 NexusPHP 站点 ---
     createNexusSite('CyanBug', 'https://cyanbug.net'),
+
+    {
+        name: 'SSD',
+        siteType: SITE_TYPES.SSD,
+        site: "https://springsunday.net/",
+    },
 
     // --- Online 类型站点 ---
     {

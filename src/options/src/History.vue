@@ -8,30 +8,10 @@
           </el-icon>
           历史记录
         </h1>
-        <p class="text-gray-500 text-sm mt-2">按站点查看以前的签到和访问状态</p>
+        <p class="text-gray-500 text-sm mt-2">按日期汇总所有站点，悬浮查看明细，点击可固定</p>
       </div>
 
-      <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
-        <el-select
-            v-model="selectedSiteKey"
-            placeholder="选择站点"
-            filterable
-            class="site-select"
-            :disabled="historyState.loading || siteOptions.length === 0"
-        >
-          <el-option
-              v-for="site in siteOptions"
-              :key="site.name"
-              :label="site.label"
-              :value="site.name"
-          >
-            <div class="flex items-center justify-between gap-4">
-              <span>{{ site.label }}</span>
-              <el-tag v-if="site.removed" size="small" type="info" effect="plain">仅历史</el-tag>
-              <el-tag v-else-if="site.siteType" size="small" effect="plain">{{ site.siteType }}</el-tag>
-            </div>
-          </el-option>
-        </el-select>
+      <div class="flex gap-3">
         <el-button :icon="Refresh" plain @click="actions.init" :loading="historyState.loading">
           刷新
         </el-button>
@@ -41,105 +21,88 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
       <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
-        <div class="text-xs text-gray-500">已记录日期</div>
-        <div class="text-2xl font-bold text-gray-800 mt-2">{{ summary.totalDays }}</div>
+        <div class="text-xs text-gray-500">总记录</div>
+        <div class="text-2xl font-bold text-gray-800 mt-2">{{ summary.total }}</div>
       </div>
       <div class="bg-green-50 rounded-xl shadow-sm p-5 border border-green-100">
-        <div class="text-xs text-green-700">{{ successLabel }}</div>
-        <div class="text-2xl font-bold text-green-700 mt-2">{{ summary.successDays }}</div>
+        <div class="text-xs text-green-700">签到成功</div>
+        <div class="text-2xl font-bold text-green-700 mt-2">{{ summary.success }}</div>
       </div>
       <div class="bg-red-50 rounded-xl shadow-sm p-5 border border-red-100">
-        <div class="text-xs text-red-700">失败记录</div>
-        <div class="text-2xl font-bold text-red-700 mt-2">{{ summary.failedDays }}</div>
+        <div class="text-xs text-red-700">签到失败</div>
+        <div class="text-2xl font-bold text-red-700 mt-2">{{ summary.failed }}</div>
       </div>
       <div class="bg-amber-50 rounded-xl shadow-sm p-5 border border-amber-100">
-        <div class="text-xs text-amber-700">待处理记录</div>
-        <div class="text-2xl font-bold text-amber-700 mt-2">{{ summary.pendingDays }}</div>
+        <div class="text-xs text-amber-700">待处理</div>
+        <div class="text-2xl font-bold text-amber-700 mt-2">{{ summary.pending }}</div>
       </div>
     </div>
 
     <div class="history-layout">
       <el-card shadow="hover" class="rounded-xl border-none calendar-panel" v-loading="historyState.loading">
-        <el-calendar v-model="calendarDate">
-          <template #date-cell="{ data }">
-            <button
-                type="button"
-                class="calendar-cell"
-                :class="{
-                  'is-today': data.day === todayString,
-                  'is-picked': data.day === selectedDay
-                }"
-                @click.stop="selectedDay = data.day"
-            >
-              <span class="cell-day">{{ Number(data.day.slice(-2)) }}</span>
-              <span
-                  v-if="getDayResult(data.day)"
-                  class="status-pill"
-                  :class="getStatusMeta(getDayResult(data.day)).className"
+        <div class="calendar-wrap" @mouseleave="onCalendarLeave">
+          <el-calendar v-model="calendarDate">
+            <template #date-cell="{ data }">
+              <button
+                  type="button"
+                  class="calendar-cell"
+                  :class="{
+                    'is-today': data.day === todayString,
+                    'is-hover': data.day === hoveredDay,
+                    'is-locked': data.day === lockedDay
+                  }"
+                  @click.stop="onCellClick(data.day)"
+                  @mouseenter="onCellEnter(data.day)"
               >
-                {{ getStatusMeta(getDayResult(data.day)).label }}
-              </span>
-            </button>
-          </template>
-        </el-calendar>
+                <span class="cell-day">{{ Number(data.day.slice(-2)) }}</span>
+                <span v-if="getDaySummary(data.day).total" class="count-pills">
+                  <span v-if="getDaySummary(data.day).success" class="pill pill-ok">✓{{ getDaySummary(data.day).success }}</span>
+                  <span v-if="getDaySummary(data.day).failed" class="pill pill-fail">✗{{ getDaySummary(data.day).failed }}</span>
+                  <span v-if="getDaySummary(data.day).pending" class="pill pill-pending">⏳{{ getDaySummary(data.day).pending }}</span>
+                </span>
+              </button>
+            </template>
+          </el-calendar>
+        </div>
       </el-card>
 
-      <div class="space-y-6">
-        <el-card shadow="hover" class="rounded-xl border-none">
-          <template #header>
-            <div class="flex items-center justify-between">
-              <span class="font-medium">日期详情</span>
-              <el-tag :type="selectedMeta.tagType" effect="plain">{{ selectedMeta.label }}</el-tag>
-            </div>
-          </template>
+      <el-card shadow="hover" class="rounded-xl border-none detail-panel">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <span class="font-medium">{{ activeDay }} 明细</span>
+            <el-tag effect="plain">{{ activeEntries.length }} 条</el-tag>
+          </div>
+        </template>
 
-          <div class="space-y-4">
-            <div>
-              <div class="text-xs text-gray-400">站点</div>
-              <div class="font-semibold text-gray-800 mt-1">{{ selectedSiteName }}</div>
+        <div class="detail-body">
+          <el-empty v-if="activeEntries.length === 0" description="这一天没有记录"/>
+          <div v-else class="detail-groups">
+            <div v-if="groupedDetail.success.length" class="detail-group">
+              <div class="group-title is-success">✓ 成功（{{ groupedDetail.success.length }}）</div>
+              <div v-for="item in groupedDetail.success" :key="item.site" class="detail-row">
+                <span class="site-name">{{ item.site }}</span>
+                <span class="site-msg">{{ getResultMessage(item.result, item.siteType) }}</span>
+              </div>
             </div>
-            <div>
-              <div class="text-xs text-gray-400">日期</div>
-              <div class="font-semibold text-gray-800 mt-1">{{ selectedDay }}</div>
+            <div v-if="groupedDetail.failed.length" class="detail-group">
+              <div class="group-title is-failed">✗ 失败（{{ groupedDetail.failed.length }}）</div>
+              <div v-for="item in groupedDetail.failed" :key="item.site" class="detail-row">
+                <span class="site-name">{{ item.site }}</span>
+                <span class="site-msg">{{ getResultMessage(item.result, item.siteType) }}</span>
+              </div>
             </div>
-            <div>
-              <div class="text-xs text-gray-400">结果</div>
-              <p class="text-sm text-gray-600 leading-6 mt-1 break-words">
-                {{ selectedMessage }}
-              </p>
-            </div>
-            <div v-if="selectedResult?.updatedAt">
-              <div class="text-xs text-gray-400">记录时间</div>
-              <div class="text-sm text-gray-600 mt-1">{{ formatTime(selectedResult.updatedAt) }}</div>
+            <div v-if="groupedDetail.pending.length" class="detail-group">
+              <div class="group-title is-pending">⏳ 待处理（{{ groupedDetail.pending.length }}）</div>
+              <div v-for="item in groupedDetail.pending" :key="item.site" class="detail-row">
+                <span class="site-name">{{ item.site }}</span>
+                <span class="site-msg">{{ getResultMessage(item.result, item.siteType) }}</span>
+              </div>
             </div>
           </div>
-        </el-card>
-
-        <el-card shadow="hover" class="rounded-xl border-none">
-          <template #header>
-            <span class="font-medium">最近记录</span>
-          </template>
-
-          <el-empty v-if="recentRecords.length === 0" description="还没有历史记录"/>
-          <div v-else class="recent-list">
-            <button
-                v-for="item in recentRecords"
-                :key="item.day"
-                type="button"
-                class="recent-item"
-                :class="{ active: item.day === selectedDay }"
-                @click="selectHistoryDay(item.day)"
-            >
-              <span class="font-medium text-gray-700">{{ item.day }}</span>
-              <el-tag :type="getStatusMeta(item.result).tagType" size="small" effect="plain">
-                {{ getStatusMeta(item.result).label }}
-              </el-tag>
-            </button>
-          </div>
-        </el-card>
-      </div>
+        </div>
+      </el-card>
     </div>
 
     <el-dialog
@@ -161,7 +124,13 @@
                 :key="site.name"
                 :label="site.label"
                 :value="site.name"
-            />
+            >
+              <div class="flex items-center justify-between gap-4">
+                <span>{{ site.label }}</span>
+                <el-tag v-if="site.removed" size="small" type="info" effect="plain">仅历史</el-tag>
+                <el-tag v-else-if="site.siteType" size="small" effect="plain">{{ site.siteType }}</el-tag>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="日期" required>
@@ -205,7 +174,7 @@
 </template>
 
 <script setup>
-import {computed, onMounted, reactive, ref, watch} from "vue";
+import {computed, onMounted, reactive, ref} from "vue";
 import {ElMessage} from "element-plus";
 import {Calendar, Plus, Refresh} from "@element-plus/icons-vue";
 import {getSiteData} from "../utils/storage/siteData.js";
@@ -214,8 +183,28 @@ import {getDateString} from "../utils/index.js";
 
 const todayString = getDateString();
 const calendarDate = ref(new Date());
-const selectedDay = ref(todayString);
-const selectedSiteKey = ref("");
+
+// hover 跟随 + click 锁定 + 离开日历解锁
+const hoveredDay = ref(null);
+const lockedDay = ref(null);
+// 离开日历后保留的「最后查看日」，避免右侧突兀跳回今天
+const fallbackDay = ref(todayString);
+
+const activeDay = computed(() => lockedDay.value ?? hoveredDay.value ?? fallbackDay.value);
+
+function onCellEnter(day) {
+  hoveredDay.value = day;
+}
+
+function onCellClick(day) {
+  lockedDay.value = day;
+  fallbackDay.value = day;
+}
+
+function onCalendarLeave() {
+  lockedDay.value = null;
+  hoveredDay.value = null;
+}
 
 const historyState = reactive({
   loading: false,
@@ -249,6 +238,7 @@ const STATUS_REMARKS = {
   "failed": "未识别到签到成功结果",
 };
 
+// 补记对话框的站点下拉选项（合并历史站点）
 const siteOptions = computed(() => {
   const options = historyState.sites.map(site => ({
     name: site.name,
@@ -272,21 +262,13 @@ const siteOptions = computed(() => {
   return options;
 });
 
-const selectedSite = computed(() =>
-    siteOptions.value.find(site => site.name === selectedSiteKey.value) ?? null
-);
-
-const selectedRecord = computed(() =>
-    historyState.records.find(record => record.key === selectedSiteKey.value) ?? null
-);
-
-const selectedSiteName = computed(() => selectedSite.value?.label || "未选择站点");
-
-const selectedSiteType = computed(() => selectedSite.value?.siteType || "");
-
-const successLabel = computed(() =>
-    selectedSiteType.value === "online" ? "已访问记录" : "签到成功"
-);
+const siteTypeMap = computed(() => {
+  const map = {};
+  historyState.sites.forEach(site => {
+    map[site.name] = site.siteType ?? "";
+  });
+  return map;
+});
 
 function getRecordDates(record) {
   return Array.isArray(record?.dates) ? record.dates : [];
@@ -309,8 +291,8 @@ function getResultDate(result) {
   return "";
 }
 
-function getDayResult(day) {
-  const record = selectedRecord.value;
+// 取某站点在某天的签到结果（原 getDayResult，改为按 record 入参，不依赖全局选中态）
+function getDayResultForRecord(record, day, siteType) {
   if (!record) {
     return null;
   }
@@ -325,7 +307,7 @@ function getDayResult(day) {
       sign: true,
       pending: false,
       status: "signed",
-      msg: selectedSiteType.value === "online" ? "访问成功" : "签到成功",
+      msg: siteType === "online" ? "访问成功" : "签到成功",
       date: day
     };
   }
@@ -338,39 +320,97 @@ function getDayResult(day) {
   return null;
 }
 
-function getStatusMeta(result) {
-  if (!result) {
-    return {
-      label: "无记录",
-      tagType: "info",
-      className: "is-empty"
-    };
-  }
+// 全局按日聚合：day -> [{ site, siteType, result }]
+const allDayEntries = computed(() => {
+  const map = {};
+  historyState.records.forEach(record => {
+    if (!record?.key) {
+      return;
+    }
+    const siteType = siteTypeMap.value[record.key] ?? "";
+    const days = new Set([
+      ...getRecordDates(record),
+      ...Object.keys(getDailyResults(record))
+    ]);
+    const lastDay = getResultDate(record.lastResult);
+    if (lastDay) {
+      days.add(lastDay);
+    }
+    days.forEach(day => {
+      if (!day) {
+        return;
+      }
+      const result = getDayResultForRecord(record, day, siteType);
+      if (!result) {
+        return;
+      }
+      (map[day] ??= []).push({site: record.key, siteType, result});
+    });
+  });
+  return map;
+});
 
-  if (result.sign) {
-    return {
-      label: selectedSiteType.value === "online" ? "已访问" : "已签到",
-      tagType: "success",
-      className: "is-success"
-    };
-  }
+// 按日计数，供日历格子渲染 ✓n ✗n ⏳n
+const daySummaryMap = computed(() => {
+  const map = {};
+  Object.entries(allDayEntries.value).forEach(([day, entries]) => {
+    let success = 0;
+    let failed = 0;
+    let pending = 0;
+    entries.forEach(({result}) => {
+      if (result.sign) {
+        success++;
+      } else if (result.pending) {
+        pending++;
+      } else {
+        failed++;
+      }
+    });
+    map[day] = {success, failed, pending, total: entries.length};
+  });
+  return map;
+});
 
-  if (result.pending) {
-    return {
-      label: "待处理",
-      tagType: "warning",
-      className: "is-pending"
-    };
-  }
-
-  return {
-    label: selectedSiteType.value === "online" ? "访问失败" : "签到失败",
-    tagType: "danger",
-    className: "is-failed"
-  };
+function getDaySummary(day) {
+  return daySummaryMap.value[day] || {success: 0, failed: 0, pending: 0, total: 0};
 }
 
-function getResultMessage(result) {
+// 全局统计卡片（记录数口径）
+const summary = computed(() => {
+  const result = {total: 0, success: 0, failed: 0, pending: 0};
+  Object.values(daySummaryMap.value).forEach(dayStat => {
+    result.total += dayStat.total;
+    result.success += dayStat.success;
+    result.failed += dayStat.failed;
+    result.pending += dayStat.pending;
+  });
+  return result;
+});
+
+const activeEntries = computed(() => allDayEntries.value[activeDay.value] || []);
+
+// 右侧明细按状态分组
+const groupedDetail = computed(() => {
+  const success = [];
+  const failed = [];
+  const pending = [];
+  activeEntries.value.forEach(entry => {
+    if (entry.result.sign) {
+      success.push(entry);
+    } else if (entry.result.pending) {
+      pending.push(entry);
+    } else {
+      failed.push(entry);
+    }
+  });
+  const bySite = (a, b) => a.site.localeCompare(b.site);
+  success.sort(bySite);
+  failed.sort(bySite);
+  pending.sort(bySite);
+  return {success, failed, pending};
+});
+
+function getResultMessage(result, siteType = "") {
   if (!result) {
     return "这一天没有记录。";
   }
@@ -381,75 +421,9 @@ function getResultMessage(result) {
     return result.detail;
   }
   if (result.sign) {
-    return selectedSiteType.value === "online" ? "访问成功" : "签到成功";
+    return siteType === "online" ? "访问成功" : "签到成功";
   }
   return STATUS_REMARKS[result.status] || "任务执行失败";
-}
-
-const knownHistoryDays = computed(() => {
-  const record = selectedRecord.value;
-  if (!record) {
-    return [];
-  }
-
-  const days = new Set([
-    ...getRecordDates(record),
-    ...Object.keys(getDailyResults(record))
-  ]);
-
-  const lastResultDate = getResultDate(record.lastResult);
-  if (lastResultDate) {
-    days.add(lastResultDate);
-  }
-
-  return Array.from(days).filter(Boolean);
-});
-
-const summary = computed(() => {
-  const result = {
-    totalDays: 0,
-    successDays: 0,
-    failedDays: 0,
-    pendingDays: 0
-  };
-
-  knownHistoryDays.value.forEach(day => {
-    const dayResult = getDayResult(day);
-    if (!dayResult) {
-      return;
-    }
-    result.totalDays++;
-    if (dayResult.sign) {
-      result.successDays++;
-    } else if (dayResult.pending) {
-      result.pendingDays++;
-    } else {
-      result.failedDays++;
-    }
-  });
-
-  return result;
-});
-
-const recentRecords = computed(() =>
-    knownHistoryDays.value
-        .map(day => ({day, result: getDayResult(day)}))
-        .filter(item => item.result)
-        .sort((a, b) => b.day.localeCompare(a.day))
-        .slice(0, 10)
-);
-
-const selectedResult = computed(() => getDayResult(selectedDay.value));
-const selectedMeta = computed(() => getStatusMeta(selectedResult.value));
-const selectedMessage = computed(() => getResultMessage(selectedResult.value));
-
-function formatTime(timestamp) {
-  return new Date(timestamp).toLocaleString();
-}
-
-function selectHistoryDay(day) {
-  selectedDay.value = day;
-  calendarDate.value = new Date(`${day}T00:00:00`);
 }
 
 const actions = {
@@ -468,8 +442,8 @@ const actions = {
   },
 
   openManualDialog() {
-    manualForm.siteKey = selectedSiteKey.value || siteOptions.value[0]?.name || "";
-    manualForm.date = selectedDay.value || todayString;
+    manualForm.siteKey = siteOptions.value[0]?.name || "";
+    manualForm.date = activeDay.value || todayString;
     manualForm.status = "signed";
     manualForm.remark = "手动补记";
     manualDialog.visible = true;
@@ -507,8 +481,8 @@ const actions = {
       };
 
       await updateSignResult(manualForm.siteKey, statusMap[manualForm.status], manualForm.date);
-      selectedSiteKey.value = manualForm.siteKey;
-      selectHistoryDay(manualForm.date);
+      fallbackDay.value = manualForm.date;
+      calendarDate.value = new Date(`${manualForm.date}T00:00:00`);
       await actions.init();
       manualDialog.visible = false;
       ElMessage.success("历史记录已补记");
@@ -518,30 +492,15 @@ const actions = {
   }
 };
 
-watch(siteOptions, options => {
-  if (options.length === 0) {
-    selectedSiteKey.value = "";
-    return;
-  }
-
-  if (!options.some(site => site.name === selectedSiteKey.value)) {
-    selectedSiteKey.value = options[0].name;
-  }
-});
-
 onMounted(() => {
   actions.init();
 });
 </script>
 
-<style scoped>
-.site-select {
-  width: 260px;
-}
-
+<style scoped lang="scss">
 .history-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 24px;
   align-items: start;
 }
@@ -552,31 +511,32 @@ onMounted(() => {
 
 .calendar-cell {
   width: 100%;
-  min-height: 88px;
+  min-height: 76px;
   padding: 8px;
   border: 0;
   background: transparent;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   color: #374151;
-}
+  transition: background 0.15s ease;
 
-.calendar-cell:hover {
-  background: #f8fafc;
-}
+  &.is-today .cell-day {
+    color: #2563eb;
+    font-weight: 700;
+  }
 
-.calendar-cell.is-today .cell-day {
-  color: #2563eb;
-  font-weight: 700;
-}
+  &.is-hover {
+    background: #f1f5f9;
+  }
 
-.calendar-cell.is-picked {
-  outline: 2px solid #93c5fd;
-  outline-offset: -2px;
-  background: #eff6ff;
+  &.is-locked {
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+    background: #eff6ff;
+  }
 }
 
 .cell-day {
@@ -584,54 +544,91 @@ onMounted(() => {
   line-height: 20px;
 }
 
-.status-pill {
-  max-width: 100%;
+.count-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pill {
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 1px 7px;
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px;
+  font-weight: 600;
   white-space: nowrap;
+
+  &.pill-ok {
+    color: #047857;
+    background: #d1fae5;
+  }
+
+  &.pill-fail {
+    color: #b91c1c;
+    background: #fee2e2;
+  }
+
+  &.pill-pending {
+    color: #b45309;
+    background: #fef3c7;
+  }
 }
 
-.status-pill.is-success {
-  color: #047857;
-  background: #d1fae5;
+.detail-body {
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
-.status-pill.is-failed {
-  color: #b91c1c;
-  background: #fee2e2;
-}
-
-.status-pill.is-pending {
-  color: #b45309;
-  background: #fef3c7;
-}
-
-.recent-list {
+.detail-groups {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 20px;
 }
 
-.recent-item {
-  width: 100%;
-  min-height: 42px;
+.detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-title {
+  font-size: 13px;
+  font-weight: 700;
+
+  &.is-success {
+    color: #047857;
+  }
+
+  &.is-failed {
+    color: #b91c1c;
+  }
+
+  &.is-pending {
+    color: #b45309;
+  }
+}
+
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding: 8px 10px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  cursor: pointer;
+  background: #fff;
 }
 
-.recent-item:hover,
-.recent-item.active {
-  border-color: #93c5fd;
-  background: #eff6ff;
+.site-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.site-msg {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 18px;
+  word-break: break-word;
 }
 
 :deep(.el-calendar__body) {
@@ -639,7 +636,7 @@ onMounted(() => {
 }
 
 :deep(.el-calendar-table .el-calendar-day) {
-  height: 104px;
+  height: 92px;
   padding: 0;
 }
 
@@ -650,10 +647,6 @@ onMounted(() => {
 @media (max-width: 900px) {
   .history-layout {
     grid-template-columns: 1fr;
-  }
-
-  .site-select {
-    width: 100%;
   }
 }
 </style>

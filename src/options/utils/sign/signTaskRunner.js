@@ -7,6 +7,7 @@ import { createSignTab, closeTabSafe } from "../tab/tabManager.js";
 import { sleep } from "../index.js";
 import { getSignStrategy } from "./signStrategies/index.js";
 import { getSettingData } from "../storage/settingData.js";
+import { SITE_TYPES } from "../../constant/site.js";
 
 // 页面/流程相关轮询与超时配置
 const PAGE_READY_POLL_INTERVAL = 500;
@@ -518,6 +519,9 @@ async function waitUntilSignable(tabId, skipVerifyPage) {
  */
 export async function handleSignTask(siteInfo) {
     const debugConfig = await getDebugConfig();
+    // xloli 等内嵌 Cloudflare Turnstile 的签到页，widget 会被 waitForVerifyPage 误判为常驻安全盾，
+    // 需强制跳过验证等待，避免误判超时导致签到失败。
+    const notVerifyPage = siteInfo.notVerifyPage || siteInfo.siteType === SITE_TYPES.XLOLI;
     const tabOptions = siteInfo.active || debugConfig.debugSignFlow ? { active: true } : { active: false, pinned: true };
     let targetUrl;
     try {
@@ -538,7 +542,7 @@ export async function handleSignTask(siteInfo) {
         console.log(`[${siteInfo.name} 签到流程] 开始 ${siteInfo.name}`);
 
         // 阶段一：等待并校验可签到状态
-        let pageBarrier = await waitUntilSignable(tab.id, siteInfo.notVerifyPage);
+        let pageBarrier = await waitUntilSignable(tab.id, notVerifyPage);
         if (pageBarrier.status !== "ready" && pageBarrier.status !== "unknown") {
             return { sign: false, pending: false, status: pageBarrier.status, msg: pageBarrier.msg, detail: pageBarrier.detail };
         }
@@ -550,13 +554,13 @@ export async function handleSignTask(siteInfo) {
         if (!result.pending) return result;
 
         const skipRetryStatuses = ["login-required", "login-captcha", "login-2fa"];
-        if (skipRetryStatuses.includes(result.status) || siteInfo.notVerifyPage) {
+        if (skipRetryStatuses.includes(result.status) || notVerifyPage) {
             console.log(`[${siteInfo.name}] 站点不需要二次验证或遇到拦截，跳过二次重试。`);
             return { ...result, pending: false };
         }
 
         console.log(`[${siteInfo.name}] 检测到 Pending 状态，等待页面刷新...`);
-        pageBarrier = await waitUntilSignable(tab.id, siteInfo.notVerifyPage);
+        pageBarrier = await waitUntilSignable(tab.id, notVerifyPage);
         if (pageBarrier.status !== "ready" && pageBarrier.status !== "unknown") {
             return { sign: false, pending: false, status: pageBarrier.status, msg: pageBarrier.msg, detail: pageBarrier.detail };
         }

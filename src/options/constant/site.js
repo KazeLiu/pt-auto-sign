@@ -11,6 +11,7 @@ export const SITE_TYPES = Object.freeze({
     ROUSI: "ROUSI",
     SSD: "SSD",
     ONLINE: 'online',
+    XLOLI: 'XLOLI',
     nexusPHP: 'nexusPHP'
 });
 

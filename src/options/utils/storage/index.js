@@ -1,4 +1,5 @@
 import browser from "webextension-polyfill";
+import {enqueueModification} from "./modifyQueue.js";
 
 function cloneForStorage(value) {
     try {
@@ -20,12 +21,13 @@ function normalizeStorageData(data) {
  * 对 `browser.storage` 提供统一的读写、列表更新和对象更新能力，
  * 用于减少业务层重复的存储取值与结构修改逻辑。
  */
-class StorageHelper {
+export class StorageHelper {
     /**
      * @param {'local' | 'sync' | 'session' | 'managed'} [area='local'] - 使用的存储分区。
      */
     constructor(area = 'local') {
-        this.storageArea = browser.storage[area];
+        this.storageArea = typeof area === 'string' ? browser.storage[area] : area;
+        this.modifyQueues = new Map();
     }
 
     /**
@@ -239,20 +241,17 @@ class StorageHelper {
      * @returns {Promise<any[] | undefined>} 修改后的列表。
      */
     async _modifyList(key, action) {
-        try {
-            const list = await this.get(key, []);
+        return this._enqueueModification(key, async () => {
+            const result = await this.storageArea.get(key);
+            const list = result?.[key] ?? [];
             if (!Array.isArray(list)) {
-                console.warn(`[Storage] Key "${key}" 不是数组`);
-                return undefined;
+                throw new TypeError(`[Storage] Key "${key}" 不是数组`);
             }
 
             const nextList = action(list);
             await this.set(key, nextList);
             return nextList;
-        } catch (error) {
-            console.error(`[Storage] 修改列表 ${key} 失败:`, error);
-            return undefined;
-        }
+        });
     }
 
     /**
@@ -264,20 +263,21 @@ class StorageHelper {
      * @returns {Promise<Object | undefined>} 修改后的对象。
      */
     async _modifyObject(key, action) {
-        try {
-            const obj = await this.get(key, {});
+        return this._enqueueModification(key, async () => {
+            const result = await this.storageArea.get(key);
+            const obj = result?.[key] ?? {};
             if (typeof obj !== 'object' || Array.isArray(obj) || obj === null) {
-                console.warn(`[Storage] Key "${key}" 不是对象`);
-                return undefined;
+                throw new TypeError(`[Storage] Key "${key}" 不是对象`);
             }
 
             const nextObj = action(obj);
             await this.set(key, nextObj);
             return nextObj;
-        } catch (error) {
-            console.error(`[Storage] 修改对象 ${key} 失败:`, error);
-            return undefined;
-        }
+        });
+    }
+
+    _enqueueModification(key, action) {
+        return enqueueModification(this.modifyQueues, key, action);
     }
 }
 

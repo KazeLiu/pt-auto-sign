@@ -23,6 +23,7 @@ const STRATEGY_MAP = {
     SSD: ssdMain,
     XLOLI: xloliMain,
     online: onlineMian,
+    nexusPHP,
 };
 
 /**
@@ -101,11 +102,11 @@ export function waitForDomResult({
 /**
  * 根据站点类型获取对应的签到策略函数。
  *
- * 未命中时默认回退到 [`nexusPHP`](src/options/utils/sign/signStrategies/nexusPHP.js) 通用策略。
+ * 未命中时返回 `undefined`，由调度器记录为策略缺失，避免错误配置被当成通用站点执行。
  *
  * @param {string} siteType - 站点类型标识。
  * @returns {Function} 对应的签到策略函数。
  */
 export function getSignStrategy(siteType) {
-    return STRATEGY_MAP[siteType] ?? nexusPHP;
+    return STRATEGY_MAP[siteType];
 }

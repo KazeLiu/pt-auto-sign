@@ -174,21 +174,22 @@
 </template>
 
 <script setup>
-import {computed, onMounted, reactive, ref} from "vue";
+import {computed, onMounted, onUnmounted, reactive, ref} from "vue";
 import {ElMessage} from "element-plus";
 import {Calendar, Plus, Refresh} from "@element-plus/icons-vue";
 import {getSiteData} from "../utils/storage/siteData.js";
 import {getSignRecords, updateSignResult} from "../utils/storage/signDate.js";
 import {getDateString} from "../utils/index.js";
 
-const todayString = getDateString();
+const todayString = ref(getDateString());
+let dateRefreshTimer;
 const calendarDate = ref(new Date());
 
 // hover 跟随 + click 锁定 + 离开日历解锁
 const hoveredDay = ref(null);
 const lockedDay = ref(null);
 // 离开日历后保留的「最后查看日」，避免右侧突兀跳回今天
-const fallbackDay = ref(todayString);
+const fallbackDay = ref(todayString.value);
 
 const activeDay = computed(() => lockedDay.value ?? hoveredDay.value ?? fallbackDay.value);
 
@@ -219,7 +220,7 @@ const manualDialog = reactive({
 
 const manualForm = reactive({
   siteKey: "",
-  date: todayString,
+  date: todayString.value,
   status: "signed",
   remark: ""
 });
@@ -236,6 +237,11 @@ const STATUS_REMARKS = {
   "script-error": "页面脚本执行失败",
   "task-error": "签到任务异常",
   "failed": "未识别到签到成功结果",
+  "page-timeout": "页面加载超时，未执行签到脚本",
+  "page-barrier": "页面弹窗未完成，待人工确认",
+  "action-triggered": "已触发签到，等待站点确认",
+  "assumed-signed": "无法确认签到入口，待人工确认",
+  "storage-error": "签到结果保存失败",
 };
 
 // 补记对话框的站点下拉选项（合并历史站点）
@@ -443,7 +449,7 @@ const actions = {
 
   openManualDialog() {
     manualForm.siteKey = siteOptions.value[0]?.name || "";
-    manualForm.date = activeDay.value || todayString;
+    manualForm.date = activeDay.value || todayString.value;
     manualForm.status = "signed";
     manualForm.remark = "手动补记";
     manualDialog.visible = true;
@@ -493,7 +499,16 @@ const actions = {
 };
 
 onMounted(() => {
+  dateRefreshTimer = window.setInterval(() => {
+    todayString.value = getDateString();
+  }, 60_000);
   actions.init();
+});
+
+onUnmounted(() => {
+  if (dateRefreshTimer) {
+    window.clearInterval(dateRefreshTimer);
+  }
 });
 </script>
 

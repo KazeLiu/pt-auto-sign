@@ -1,9 +1,10 @@
 {
   "name": "PT Auto Sign",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.2",
   "type": "module",
   "scripts": {
+    "test": "node --test test/*.test.js",
     "dev": "vite",
     "build": "vite build"
   },

@@ -1,4 +1,22 @@
-export function nexusPHP() {
+export async function nexusPHP() {
+    // 日志收集
+    const logs = [];
+    const log = (...args) => {
+        const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        const message = args.map(arg => {
+            if (typeof arg === 'object' && arg !== null) {
+                try {
+                    return JSON.stringify(arg);
+                } catch (e) {
+                    return String(arg);
+                }
+            }
+            return String(arg);
+        }).join(' ');
+        logs.push(`[${timestamp}] ${message}`);
+        console.log(...args);
+    };
+
     const normalizeText = (text = '') => String(text)
         .replace(/\u00a0/g, ' ')
         .replace(/[ \t]+/g, ' ')
@@ -17,6 +35,73 @@ export function nexusPHP() {
         .flatMap(selector => Array.from(document.querySelectorAll(selector)))
         .map(node => normalizeText(node.innerText ?? node.textContent ?? ''))
         .filter(Boolean);
+
+    // 等待并关闭 layui 弹窗（支持倒计时）
+    const waitAndCloseLayuiModal = async () => {
+        const MAX_WAIT = 15000; // 最多等待 15 秒
+        const POLL_INTERVAL = 500; // 每 500ms 检查一次
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < MAX_WAIT) {
+            // 查找可见的 layui 弹窗
+            const modal = document.querySelector('.layui-layer:not([style*="display: none"])');
+            if (!modal || window.getComputedStyle(modal).display === 'none') {
+                log('[nexusPHP] 未检测到 layui 弹窗或已关闭');
+                return true; // 没有弹窗或已关闭
+            }
+
+            // 查找 layui 弹窗的确认按钮
+            const button = modal.querySelector('.layui-layer-btn0');
+            if (!button || window.getComputedStyle(button).display === 'none') {
+                log('[nexusPHP] 找不到 layui 按钮');
+                return false; // 找不到按钮
+            }
+
+            // 检查按钮是否可点击
+            const style = window.getComputedStyle(button);
+            const pointerEvents = style.pointerEvents;
+            const text = (button.innerText || button.textContent || '').trim();
+            const isCountdown = /请等待|等待|\(\d+\)/.test(text);
+
+            if (pointerEvents !== 'none' && !isCountdown) {
+                // 按钮可点击，立即点击
+                try {
+                    button.click();
+                    log(`[nexusPHP] 已点击 layui 弹窗按钮: ${text}`);
+                    // 等待弹窗消失
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    return true;
+                } catch (e) {
+                    log(`[nexusPHP] 点击 layui 弹窗按钮失败:`, e);
+                    return false;
+                }
+            }
+
+            // 按钮还在倒计时，继续等待
+            log(`[nexusPHP] layui 弹窗倒计时中: ${text}，继续等待...`);
+            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+        }
+
+        log('[nexusPHP] 等待 layui 弹窗超时');
+        return false;
+    };
+
+    // 异步等待并关闭弹窗
+    const modalClosed = await waitAndCloseLayuiModal();
+    const modalStillVisible = Boolean(document.querySelector('.layui-layer:not([style*="display: none"])'));
+    if (!modalClosed && modalStillVisible) {
+        const modalText = normalizeText(document.querySelector('.layui-layer')?.innerText ?? '');
+        return {
+            sign: false,
+            pending: true,
+            status: 'page-barrier',
+            title: '页面弹窗未完成',
+            text: modalText,
+            msg: '页面弹窗未完成，待确认',
+            detail: modalText,
+            logs: logs.join('\n'),
+        };
+    }
 
     const signTitle = getFirstText([
         'td.outer table.main .embedded h2',
@@ -67,7 +152,11 @@ export function nexusPHP() {
     const successLine = matchLine(successPatterns);
     const failureLine = matchLine(failurePatterns);
 
-    // NexusPHP 常把“今日已签到/请勿重复签到”放在抱歉或错误页正文里，正文命中才算成功。
+    log(`[nexusPHP] 提取结果 - 标题: ${signTitle}, 成功行: ${successLine}, 失败行: ${failureLine}`);
+
+    const logsText = logs.join('\n');
+
+    // NexusPHP 常把"今日已签到/请勿重复签到"放在抱歉或错误页正文里，正文命中才算成功。
     if (successLine && !failureLine) {
         return {
             sign: true,
@@ -77,6 +166,7 @@ export function nexusPHP() {
             text: signText || bodyText,
             msg: successLine || signTitle || '签到成功',
             detail: signText || bodyText,
+            logs: logsText,
         };
     }
 
@@ -89,5 +179,6 @@ export function nexusPHP() {
         text: signText || bodyText,
         msg: failureLine || signTitle || signText || '未识别到 NexusPHP 签到结果',
         detail: signText || bodyText,
+        logs: logsText,
     };
 }

@@ -15,12 +15,13 @@ export function ttgMain() {
     if (signBtnHtml?.innerText === '签到') {
         signBtnHtml.click();
         return {
-            sign: true,
-            pending: false,
-            title: '签到成功',
+            sign: false,
+            pending: true,
+            status: 'action-triggered',
+            title: '已触发签到',
             text: signBtnHtml.innerText,
-            msg: '已触发签到',
-            detail: signBtnHtml.innerText,
+            msg: '已触发签到，待确认',
+            detail: '按钮已点击，但尚未识别到站点返回的签到结果',
         };
     }
 

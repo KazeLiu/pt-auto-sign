@@ -3,22 +3,24 @@ export function btSchoolMain() {
 
     if (!checkInBtn) {
         return {
-            sign: true,
-            pending: false,
-            title: '签到成功',
-            text: '找不到签到按钮，默认为签到成功',
-            msg: '签到成功',
-            detail: '找不到签到按钮，默认为签到成功',
+            sign: false,
+            pending: true,
+            status: 'assumed-signed',
+            title: '无法确认签到状态',
+            text: '找不到签到按钮，无法确认页面状态',
+            msg: '未找到签到入口，待确认',
+            detail: '找不到签到按钮，可能是页面结构变化或登录状态异常',
         };
     }
 
     checkInBtn.click();
     return {
-        sign: true,
-        pending: false,
-        title: '签到成功',
-        text: '已触发签到按钮',
-        msg: '签到成功',
-        detail: '已触发签到按钮',
+        sign: false,
+        pending: true,
+        status: 'action-triggered',
+        title: '已触发签到',
+        text: '已触发签到按钮，等待站点结果',
+        msg: '已触发签到，待确认',
+        detail: '按钮已点击，但当前页面没有可验证的成功结果',
     };
 }

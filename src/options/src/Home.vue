@@ -86,6 +86,12 @@
                   {{ row.siteType === 'online' ? '已访问' : '已签到' }}
                 </div>
               </el-tag>
+              <el-tag v-else-if="tableModel.checkIsPendingToday(row.name)" type="warning" effect="dark" round>
+                <div class="flex gap-1 items-center">
+                  <el-icon class="mr-1"><Timer/></el-icon>
+                  待确认
+                </div>
+              </el-tag>
               <el-tag v-else type="danger" effect="plain" round>
                 <div class="flex gap-1 items-center">
                   <el-icon class="mr-1">
@@ -137,13 +143,14 @@
 </template>
 
 <script setup>
-import {computed, nextTick, onMounted, reactive, ref} from "vue";
+import {computed, nextTick, onMounted, onUnmounted, reactive, ref} from "vue";
 import {useRoute} from "vue-router";
 import router from "../router/index.js";
 import {ElLoading, ElMessage} from "element-plus";
 import {VideoPlay, Refresh, InfoFilled, List, Check, Timer, Select, CloseBold, Link} from "@element-plus/icons-vue";
 import {handleSignTask} from "../utils/sign/index.js";
-import {addSignDate, getSignRecords, updateSignResult} from "../utils/storage/signDate.js";
+import {getSignRecords, updateSignResult} from "../utils/storage/signDate.js";
+import {isRecordSignedOnDate, getRecordResultOnDate} from "../utils/sign/signResult.js";
 import {storage} from "../utils/storage";
 import {sendIyuuNotice} from "../utils/iyuu/index.js";
 import {getSiteData} from "../utils/storage/siteData.js";
@@ -152,7 +159,8 @@ import {getDateString, sleep} from "../utils/index.js";
 
 const route = useRoute();
 const tableRef = ref(null);
-const todayString = computed(() => getDateString());
+const todayString = ref(getDateString());
+let dateRefreshTimer;
 const STATUS_REMARKS = {
   "login-required": "需要重新登录",
   "login-captcha": "登录页存在验证码",
@@ -166,6 +174,11 @@ const STATUS_REMARKS = {
   "script-error": "页面脚本执行失败",
   "task-error": "签到任务异常",
   "failed": "未识别到签到成功结果",
+  "page-timeout": "页面加载超时，未执行签到脚本",
+  "page-barrier": "页面弹窗未完成，待人工确认",
+  "action-triggered": "已触发签到，等待站点确认",
+  "assumed-signed": "无法确认签到入口，待人工确认",
+  "storage-error": "签到结果保存失败",
 };
 
 function getSelectedSites() {
@@ -255,8 +268,12 @@ const tableModel = reactive({
 
   checkIsSignedToday(siteName) {
     const record = this.getRecord(siteName);
-    const dates = record?.dates;
-    return Array.isArray(dates) && dates.includes(todayString.value);
+    return isRecordSignedOnDate(record, todayString.value);
+  },
+
+  checkIsPendingToday(siteName) {
+    const result = getRecordResultOnDate(this.getRecord(siteName), todayString.value);
+    return Boolean(result?.pending);
   },
 
   getRemark(siteName) {
@@ -311,7 +328,16 @@ const signModel = reactive({
   async allSign(isAutoSign = false) {
     const selectedSites = getSelectedSites();
     if (selectedSites.length === 0) {
-      ElMessage.warning("请先勾选需要签到的站点哟～");
+      if (isAutoSign) {
+        try {
+          await chrome.runtime.sendMessage({type: "AUTO_SIGN_COMPLETED", date: getDateString()});
+        } catch {
+          // 没有后台监听器时不影响自动签到窗口关闭。
+        }
+        setTimeout(() => window.close(), 1000);
+      } else {
+        ElMessage.warning("请先勾选需要签到的站点哟～");
+      }
       return;
     }
 
@@ -320,6 +346,8 @@ const signModel = reactive({
     const maxRetries = 1;
     let currentTry = 0;
     let pendingSites = [...selectedSites];
+    const terminalFailures = [];
+    let batchCompleted = false;
 
     const loadingInstance = ElLoading.service({
       lock: true,
@@ -367,7 +395,10 @@ const signModel = reactive({
           .map(site => resultMap.get(site.name))
           .filter(Boolean);
 
-        const nonRetryStatuses = new Set(["login-required", "login-captcha", "login-2fa", "secondary-auth"]);
+        const nonRetryStatuses = new Set([
+          "login-required", "login-captcha", "login-2fa", "secondary-auth",
+          "action-triggered", "assumed-signed"
+        ]);
         const failedSites = [];
         for (const {site, res, background} of currentPassResults) {
           const suffix = background ? " (并发)" : "";
@@ -379,31 +410,47 @@ const signModel = reactive({
 
           const status = res.result?.status ?? "";
           if (nonRetryStatuses.has(status)) {
-            reportList.push(`${msgWithSite} (跳过重试)${suffix}`);
+            if (!terminalFailures.some(item => item.name === site.name)) {
+              terminalFailures.push(site);
+            }
+            reportList.push(`${msgWithSite} (跳过重试)`);
             continue;
           }
 
           failedSites.push(site);
-          reportList.push(`${msgWithSite}${suffix}`);
+          reportList.push(msgWithSite);
         }
 
         pendingSites = failedSites;
         currentTry++;
       }
 
+      const unresolvedSites = [...new Map([
+        ...terminalFailures.map(site => [site.name, site]),
+        ...pendingSites.map(site => [site.name, site]),
+      ]).values()];
+      batchCompleted = unresolvedSites.length === 0;
+
       await sendIyuuNotice("批量签到结果", reportList.join("\n"));
       await tableModel.fetchRecords();
       tableModel.autoSelectUnsigned();
 
-      if (pendingSites.length === 0) {
+      if (batchCompleted) {
         ElMessage.success("批量任务全部执行完毕哟！✨");
       } else {
-        ElMessage.warning(`任务执行完毕，但仍有 ${pendingSites.length} 个站点失败，已被重新勾选。`);
+        ElMessage.warning(`任务执行完毕，但仍有 ${unresolvedSites.length} 个站点未确认，已被重新勾选。`);
       }
     } finally {
       loadingInstance.close();
       this.isBatchSigning = false;
       if (isAutoSign) {
+        if (batchCompleted) {
+          try {
+            await chrome.runtime.sendMessage({type: "AUTO_SIGN_COMPLETED", date: getDateString()});
+          } catch {
+            // 自动签到结果已经保存在本地，后台通知失败不影响页面收尾。
+          }
+        }
         setTimeout(() => {
           window.close();
         }, 3000);
@@ -422,11 +469,11 @@ const signModel = reactive({
         text: rawResult?.text ?? "",
         msg: rawResult?.msg ?? `${site.name} 返回空结果`,
         detail: rawResult?.detail ?? rawResult?.text ?? "",
+        logs: rawResult?.logs ?? "",
       };
 
       await updateSignResult(site.name, result);
       if (result.sign) {
-        await addSignDate(site.name, todayString.value);
         return {success: true, msg: getSignResultMessage(site.name, result), result};
       }
       return {success: false, msg: getSignResultMessage(site.name, result), result};
@@ -435,13 +482,17 @@ const signModel = reactive({
       const fallbackResult = {
         sign: false,
         pending: false,
-        status: "task-error",
+        status: "storage-error",
         title: "",
         text: "",
-        msg: `${site.name} 执行出错`,
+        msg: `${site.name} 结果保存失败`,
         detail: error?.message ?? "",
       };
-      await updateSignResult(site.name, fallbackResult);
+      try {
+        await updateSignResult(site.name, fallbackResult);
+      } catch (persistError) {
+        console.error(`[${site.name}] 保存失败结果时再次出错:`, persistError);
+      }
       return {success: false, msg: fallbackResult.msg, result: fallbackResult};
     }
   },
@@ -457,19 +508,26 @@ async function saveOnceUseTime() {
 }
 
 onMounted(async () => {
+  dateRefreshTimer = window.setInterval(() => {
+    todayString.value = getDateString();
+  }, 60_000);
   await saveOnceUseTime();
   await tableModel.init();
   await settingModel.init();
 
   if (route.query.action === "autoSign") {
     setTimeout(() => {
-      if (tableModel.tableData.length > 0) {
-        signModel.allSign(true);
-      }
+      signModel.allSign(true);
       const query = {...route.query};
       delete query.action;
       router.replace({query});
     }, 1000);
+  }
+});
+
+onUnmounted(() => {
+  if (dateRefreshTimer) {
+    window.clearInterval(dateRefreshTimer);
   }
 });
 </script>

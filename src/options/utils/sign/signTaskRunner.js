@@ -481,7 +481,16 @@ async function runSignScript(tabId, siteInfo) {
             detail = rawResult.detail ?? rawResult.text ?? ""
         } = rawResult;
 
-        const normalizedResult = { sign, pending, status, title, text, msg, detail };
+        const normalizedResult = {
+            sign,
+            pending,
+            status,
+            title,
+            text,
+            msg,
+            detail,
+            logs: rawResult.logs ?? "",
+        };
         console.log(`[${siteInfo.name} 签到流程] 执行结果：`, normalizedResult);
         return normalizedResult;
     } catch (err) {
@@ -493,7 +502,19 @@ async function runSignScript(tabId, siteInfo) {
  * 在执行签到前等待页面可交互，并视配置等待验证盾通过后再识别页面拦截态。
  */
 async function waitUntilSignable(tabId, skipVerifyPage) {
-    await waitForPageInteractive(tabId);
+    const pageReady = await waitForPageInteractive(tabId);
+    if (!pageReady) {
+        const siteError = normalizePageStatusResult(
+            await detectSiteError(tabId, skipVerifyPage),
+            "页面错误检测返回空结果"
+        );
+        if (isBlockedPageStatus(siteError)) return siteError;
+        return {
+            status: "page-timeout",
+            msg: "页面加载超时，未执行签到脚本",
+            detail: await getPagePreview(tabId),
+        };
+    }
 
     const siteError = normalizePageStatusResult(await detectSiteError(tabId, skipVerifyPage), "页面错误检测返回空结果");
     if (isBlockedPageStatus(siteError)) return siteError;
@@ -554,6 +575,11 @@ export async function handleSignTask(siteInfo) {
         if (!result.pending) return result;
 
         const skipRetryStatuses = ["login-required", "login-captcha", "login-2fa"];
+        const preservePendingStatuses = ["action-triggered", "assumed-signed"];
+        if (preservePendingStatuses.includes(result.status)) {
+            console.log(`[${siteInfo.name}] 仅记录为待确认，避免重复点击签到按钮。`);
+            return result;
+        }
         if (skipRetryStatuses.includes(result.status) || notVerifyPage) {
             console.log(`[${siteInfo.name}] 站点不需要二次验证或遇到拦截，跳过二次重试。`);
             return { ...result, pending: false };

@@ -1,29 +1,59 @@
 import { SETTINGS_KEY } from "./options/utils/storage/settingData.js";
 import {getDateString} from "./options/utils/index.js";
+import {hasUnsignedEnabledSite} from "./options/utils/autoSignState.js";
+import {isRecordSignedOnDate} from "./options/utils/sign/signResult.js";
 
 console.log("Hello from the PT sign");
 
 // 常量定义：定时器名称与自动签到标记
 const ALARM_NAME = 'AUTO_SIGN_ALARM';
 const AUTO_SIGN_FLAG_KEY = 'last_auto_sign_date';
+const AUTO_SIGN_INFLIGHT_KEY = 'auto_sign_inflight';
+const AUTO_SIGN_INFLIGHT_TIMEOUT = 30 * 60 * 1000;
 
 /**
  * 辅助函数：触发签到独立窗口弹窗
  */
 function triggerSignWindow() {
-    const baseUrl = chrome.runtime.getURL('src/options/index.html');
-    const url = `${baseUrl}#/Home?action=autoSign`;
+    return new Promise((resolve, reject) => {
+        const baseUrl = chrome.runtime.getURL('src/options/index.html');
+        const url = `${baseUrl}#/Home?action=autoSign`;
 
-    // 创建一个聚焦的独立新窗口来执行签到，方便处理可能出现的动态验证
-    chrome.windows.create({
-        url: url,
-        type: 'normal',
-        width: 1600,
-        height: 800,
-        focused: true
-    }, (window) => {
-        console.log('[自动签到] 已弹出独立窗口，窗口 ID:', window.id);
+        // 创建一个聚焦的独立新窗口来执行签到，方便处理可能出现的动态验证
+        chrome.windows.create({
+            url,
+            type: 'normal',
+            width: 1600,
+            height: 800,
+            focused: true
+        }, (window) => {
+            const lastError = chrome.runtime.lastError;
+            if (lastError || !window?.id) {
+                reject(new Error(lastError?.message || '自动签到窗口创建失败'));
+                return;
+            }
+            console.log('[自动签到] 已弹出独立窗口，窗口 ID:', window.id);
+            resolve(window);
+        });
     });
+}
+
+async function startAutoSign(todayStr) {
+    await chrome.storage.local.set({
+        [AUTO_SIGN_INFLIGHT_KEY]: {
+            date: todayStr,
+            startedAt: Date.now(),
+        }
+    });
+
+    try {
+        await triggerSignWindow();
+        return true;
+    } catch (error) {
+        await chrome.storage.local.remove(AUTO_SIGN_INFLIGHT_KEY);
+        console.error('[自动签到] 启动签到窗口失败:', error);
+        return false;
+    }
 }
 
 /**
@@ -62,21 +92,29 @@ async function checkMissedAutoSign(settings) {
     if (now.getTime() <= target.getTime()) return;
 
     const todayStr = getDateString(now);
-    const localData = await chrome.storage.local.get([AUTO_SIGN_FLAG_KEY, 'site_sign_records']);
+    const localData = await chrome.storage.local.get([
+        AUTO_SIGN_INFLIGHT_KEY,
+        'site_sign_records',
+        'site_data',
+    ]);
 
-    // 1. 检查今天是否已经触发过自动签到（防止浏览器多次重启重复弹窗）
-    if (localData[AUTO_SIGN_FLAG_KEY] === todayStr) return;
+    const inflight = localData[AUTO_SIGN_INFLIGHT_KEY];
+    if (inflight?.date === todayStr && Date.now() - Number(inflight.startedAt) < AUTO_SIGN_INFLIGHT_TIMEOUT) {
+        return;
+    }
 
-    // 2. 检查具体的签到记录，看是否有站点还没签到
-    const records = localData.site_sign_records || [];
-    const hasSignedToday = records.some(item => item.dates && item.dates.includes(todayStr));
+    // 2. 检查所有启用站点，而不是只看是否存在任意一个成功记录
+    const records = Array.isArray(localData.site_sign_records)
+        ? localData.site_sign_records
+        : [];
+    const sites = localData.site_data || [];
+    const needsSign = Array.isArray(sites) && sites.length > 0
+        ? hasUnsignedEnabledSite(sites, records, todayStr)
+        : records.length === 0 || records.some(record => !isRecordSignedOnDate(record, todayStr));
 
-    // 只要今天没有留下任何签到成功的记录，说明需要执行一次全部签到
-    if (!hasSignedToday) {
+    if (needsSign) {
         console.log('[自动签到] 检测到错过今日签到时间，准备执行补救签到！🚀');
-        // 更新今日已触发标记
-        await chrome.storage.local.set({ [AUTO_SIGN_FLAG_KEY]: todayStr });
-        triggerSignWindow();
+        await startAutoSign(todayStr);
     }
 }
 
@@ -102,6 +140,7 @@ async function setupAutoSignAlarm() {
             chrome.alarms.create(ALARM_NAME, {when: nextTime});
             console.log(`[自动签到] 已开启，下次执行时间为 ${new Date(nextTime).toLocaleString()}`);
         } else {
+            await chrome.storage.local.remove(AUTO_SIGN_INFLIGHT_KEY);
             console.log('[自动签到] 未开启或未配置时间。');
         }
     } catch (error) {
@@ -121,14 +160,25 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         console.log('[自动签到] 时间到，正在触发弹窗签到任务！');
 
         const todayStr = getDateString();
-
-        // 定时器正常触发时，也要记录今日标记，避免重启浏览器时误判漏签
-        chrome.storage.local.set({ [AUTO_SIGN_FLAG_KEY]: todayStr }).then(() => {
-            triggerSignWindow();
-            // 重新设置明天的定时器
+        startAutoSign(todayStr).finally(() => {
+            // 重新设置明天的定时器；成功标记由自动签到窗口在全部站点确认后回传。
             setupAutoSignAlarm();
         });
     }
+});
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== 'AUTO_SIGN_COMPLETED') return;
+
+    const date = message.date || getDateString();
+    chrome.storage.local.set({[AUTO_SIGN_FLAG_KEY]: date})
+        .then(() => chrome.storage.local.remove(AUTO_SIGN_INFLIGHT_KEY))
+        .then(() => sendResponse({ok: true}))
+        .catch(error => {
+            console.error('[自动签到] 保存完成标记失败:', error);
+            sendResponse({ok: false});
+        });
+    return true;
 });
 
 // 监听器：监听 Storage 的变化，以便在 Setting.vue 中修改设置后立即生效

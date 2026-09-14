@@ -278,7 +278,8 @@ const tableModel = reactive({
 
   getRemark(siteName) {
     const record = this.getRecord(siteName);
-    return getStatusRemark(record?.lastResult);
+    const result = getRecordResultOnDate(record, todayString.value);
+    return getStatusRemark(result);
   },
 
   autoSelectUnsigned() {

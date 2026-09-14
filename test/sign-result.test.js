@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+    getRecordResultOnDate,
     isConfirmedSignResult,
     isRecordSignedOnDate,
     mergeSignRecord,
@@ -64,4 +65,16 @@ test('failed retry does not make the current day look successful', () => {
 
     assert.equal(isRecordSignedOnDate(next, '2026-08-18'), false);
     assert.deepEqual(next.dates, ['2026-08-18']);
+});
+
+test('today result lookup does not reuse yesterday last result', () => {
+    const record = mergeSignRecord(null, 'demo', {
+        sign: true,
+        pending: false,
+        status: 'signed',
+        msg: '昨天签到成功',
+    }, '2026-08-18');
+
+    assert.equal(getRecordResultOnDate(record, '2026-08-19'), null);
+    assert.equal(record.lastResult.msg, '昨天签到成功');
 });

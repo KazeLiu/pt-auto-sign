@@ -254,7 +254,7 @@
 
 <script setup>
 import {onMounted, reactive, ref} from "vue";
-import {getSiteData, setSiteData} from "../utils/storage/siteData.js";
+import {getSiteData, setSiteData, validateSiteList} from "../utils/storage/siteData.js";
 import {SITE_LIST, SITE_TYPES} from "../constant/site.js";
 import {ElMessage, ElMessageBox} from "element-plus";
 import {openInNewTab} from "../utils/index.js";
@@ -363,6 +363,7 @@ const actions = {
     }
 
     try {
+      validateSiteList(appState.list);
       await actions.saveAllData();
       dialogState.visible = false;
       ElMessage.success(dialogState.isEdit ? `已更新 ${newItem.name}` : `已添加 ${newItem.name}`);
@@ -436,12 +437,14 @@ const actions = {
               const importedData = JSON.parse(e.target.result);
               if (Array.isArray(importedData)) {
                 // 3. 直接覆盖数据，不再去重
-                appState.list = importedData.map(item => ({
+                const nextList = importedData.map(item => ({
                   enabled: true,
                   notVerifyPage: false,
                   siteType: "nexusPHP",
                   ...item
                 }));
+                validateSiteList(nextList);
+                appState.list = nextList;
                 actions.saveAllData()
                     .then(() => {
                       console.log(`[站点列表] 站点数据已覆盖，共 ${appState.list.length} 个`);

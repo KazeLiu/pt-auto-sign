@@ -2,6 +2,7 @@ export function ssdMain() {
     const createResult = ({
         sign = false,
         pending = false,
+        status,
         title = '',
         text = '',
         msg = '',
@@ -9,6 +10,7 @@ export function ssdMain() {
     } = {}) => ({
         sign,
         pending,
+        ...(status ? {status} : {}),
         title,
         text,
         msg: msg || title || text || (sign ? '签到成功' : '签到失败'),
@@ -84,10 +86,12 @@ export function ssdMain() {
                 clearInterval(timer);
                 if (confirmedCount > 0) {
                     resolve(createResult({
-                        sign: true,
-                        title: '公告确认完成',
-                        text: `已确认 ${confirmedCount} 条未读公告`,
-                        msg: `已确认 ${confirmedCount} 条未读公告`,
+                        sign: false,
+                        pending: true,
+                        status: 'page-barrier',
+                        title: '公告确认未完成',
+                        text: `已尝试确认 ${confirmedCount} 次，但弹窗仍未关闭`,
+                        msg: '公告弹窗仍存在，需要人工确认',
                         detail: lastModalText,
                     }));
                     return;
@@ -95,10 +99,12 @@ export function ssdMain() {
 
                 const pageText = normalizeText(document.body?.innerText || '');
                 resolve(createResult({
-                    sign: true,
-                    title: '未发现未读公告弹窗',
-                    text: '未发现未读公告弹窗，可能已确认',
-                    msg: '未发现未读公告弹窗，可能已确认',
+                    sign: false,
+                    pending: true,
+                    status: 'assumed-signed',
+                    title: '无法确认公告状态',
+                    text: '未发现未读公告弹窗，无法确认是否已完成',
+                    msg: '未发现可验证的签到成功证据，待确认',
                     detail: pageText.slice(0, 200),
                 }));
             }

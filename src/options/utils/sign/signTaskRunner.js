@@ -209,6 +209,7 @@ async function waitForPageInteractive(tabId, timeout = PAGE_READY_TIMEOUT) {
  */
 async function waitForVerifyPage(tabId, timeout = VERIFY_TIMEOUT) {
     const startTime = Date.now();
+    let challengeActivated = false;
     console.log(`[Tab ${tabId}] 开始检测并等待安全盾...`);
 
     while (Date.now() - startTime < timeout) {
@@ -218,15 +219,31 @@ async function waitForVerifyPage(tabId, timeout = VERIFY_TIMEOUT) {
             const isShieldPresent = await executeInTab(tabId, (keywords) => {
                 const text = `${document.title ?? ""}\n${document.body?.innerText ?? ""}`.toLowerCase();
                 const hasKeyword = keywords.some(keyword => text.includes(keyword.toLowerCase()));
-                const hasChallengeDom = Boolean(document.querySelector(
-                    "[id*='cf-'], [class*='cf-'], script[src*='challenge'], iframe[src*='challenge']"
-                ));
+                const isVisible = (node) => {
+                    if (!node) return false;
+                    const style = window.getComputedStyle(node);
+                    return style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        style.opacity !== '0' &&
+                        node.getClientRects().length > 0;
+                };
+                const hasChallengeDom = Array.from(document.querySelectorAll(
+                    "[id*='cf-'], [class*='cf-'], iframe[src*='challenge'], iframe[src*='turnstile']"
+                )).some(isVisible);
                 return hasKeyword || hasChallengeDom;
             }, [VERIFY_KEYWORDS]);
 
             if (!hasVerifyUrl && !isShieldPresent) {
                 console.log(`[Tab ${tabId}] 盾已消失（或未检测到），准备通过。`);
                 return true;
+            }
+            if (!challengeActivated) {
+                challengeActivated = true;
+                try {
+                    await browser.tabs.update(tabId, {active: true, pinned: false});
+                } catch (error) {
+                    console.warn(`[Tab ${tabId}] 无法激活安全验证页面:`, error?.message);
+                }
             }
             console.log(`[Tab ${tabId}] 检测到盾，等待 1s...`);
             await sleep(VERIFY_POLL_INTERVAL);
@@ -236,7 +253,7 @@ async function waitForVerifyPage(tabId, timeout = VERIFY_TIMEOUT) {
             await sleep(VERIFY_POLL_INTERVAL);
         }
     }
-    console.warn(`[Tab ${tabId}] 等待盾消失超时 (${timeout}ms)，尝试继续执行`);
+    console.warn(`[Tab ${tabId}] 等待盾消失超时 (${timeout}ms)，转为人工处理`);
     return false;
 }
 
@@ -369,7 +386,10 @@ async function detectPageBarrier(tabId) {
                 return hasLoginField && hasLoginSubmit;
             });
             const hasStandalonePasswordLogin = hasPasswordInput(inputs) && hasLoginButton;
-            const hasLoginBarrier = hasLoginForm || hasStandalonePasswordLogin;
+            const loginRoute = /(?:^|\/)(?:login|signin|sign-in|auth)(?:[\/?#]|$)/i.test(location.pathname);
+            const hasLoginRouteBarrier = loginRoute &&
+                (hasPasswordInput(inputs) || hasLoginFieldKeyword || hasLoginButton);
+            const hasLoginBarrier = hasLoginForm || hasStandalonePasswordLogin || hasLoginRouteBarrier;
 
             const hasTwoFactorBarrier = (hasLoginBarrier || hasTwoFactorFieldKeyword) && hasTwoFactorFieldKeyword &&
                 (hasTwoFactorButton || ["二次验证", "二级验证", "2fa"].some(k => title.includes(k)));
@@ -442,7 +462,15 @@ async function waitForPageBarrier(tabId) {
     console.log(`[Tab ${tabId}] 开始检测页面拦截态...`);
     try {
         await waitForPageInteractive(tabId);
-        await waitForBarrierDomReady(tabId);
+        const domReady = await waitForBarrierDomReady(tabId);
+        if (!domReady) {
+            return {
+                status: "page-indeterminate",
+                pending: true,
+                msg: "页面结构未稳定，无法安全判断签到状态",
+                detail: await getPagePreview(tabId),
+            };
+        }
         await browser.tabs.get(tabId);
 
         const result = normalizePageStatusResult(await detectPageBarrier(tabId), "页面拦截态检测返回空结果");
@@ -517,17 +545,34 @@ async function waitUntilSignable(tabId, skipVerifyPage) {
     }
 
     const siteError = normalizePageStatusResult(await detectSiteError(tabId, skipVerifyPage), "页面错误检测返回空结果");
+    if (siteError.status === "unknown") {
+        return {
+            status: "page-indeterminate",
+            pending: true,
+            msg: siteError.msg || "无法确认页面状态",
+            detail: siteError.detail,
+        };
+    }
     if (isBlockedPageStatus(siteError)) return siteError;
 
     const verifyPassed = skipVerifyPage ? true : await waitForVerifyPage(tabId);
 
     const postVerifySiteError = normalizePageStatusResult(await detectSiteError(tabId, skipVerifyPage), "页面错误检测返回空结果");
+    if (postVerifySiteError.status === "unknown") {
+        return {
+            status: "page-indeterminate",
+            pending: true,
+            msg: postVerifySiteError.msg || "安全验证后无法确认页面状态",
+            detail: postVerifySiteError.detail,
+        };
+    }
     if (isBlockedPageStatus(postVerifySiteError)) return postVerifySiteError;
 
     if (!verifyPassed) {
         return {
-            status: "cloudflare-timeout",
-            msg: "等待安全验证通过超时",
+            status: "challenge-required",
+            pending: true,
+            msg: "安全验证未自动完成，请在保留的页面中人工处理",
             detail: await getPagePreview(tabId)
         };
     }
@@ -558,14 +603,32 @@ export async function handleSignTask(siteInfo) {
     }
 
     const tab = await createSignTab(targetUrl, tabOptions);
+    let keepTabOpen = false;
+    const keepPendingTabVisible = async () => {
+        keepTabOpen = true;
+        try {
+            await browser.tabs.update(tab.id, {active: true, pinned: false});
+        } catch (error) {
+            console.warn(`[${siteInfo.name}] 无法激活待确认标签页:`, error?.message);
+        }
+    };
 
     try {
         console.log(`[${siteInfo.name} 签到流程] 开始 ${siteInfo.name}`);
 
         // 阶段一：等待并校验可签到状态
         let pageBarrier = await waitUntilSignable(tab.id, notVerifyPage);
-        if (pageBarrier.status !== "ready" && pageBarrier.status !== "unknown") {
-            return { sign: false, pending: false, status: pageBarrier.status, msg: pageBarrier.msg, detail: pageBarrier.detail };
+        if (pageBarrier.status !== "ready") {
+            const pending = Boolean(pageBarrier.pending);
+            if (pending) await keepPendingTabVisible();
+            return {
+                sign: false,
+                pending,
+                keepTabOpen: pending,
+                status: pageBarrier.status,
+                msg: pageBarrier.msg,
+                detail: pageBarrier.detail,
+            };
         }
 
         // 阶段二：执行签到脚本
@@ -575,32 +638,52 @@ export async function handleSignTask(siteInfo) {
         if (!result.pending) return result;
 
         const skipRetryStatuses = ["login-required", "login-captcha", "login-2fa"];
-        const preservePendingStatuses = ["action-triggered", "assumed-signed"];
+        const preservePendingStatuses = ["action-triggered", "assumed-signed", "ambiguous-result", "challenge-required", "page-barrier", "page-indeterminate"];
         if (preservePendingStatuses.includes(result.status)) {
             console.log(`[${siteInfo.name}] 仅记录为待确认，避免重复点击签到按钮。`);
+            await keepPendingTabVisible();
+            result.pending = true;
+            result.status = result.status || "pending";
+            result.keepTabOpen = true;
             return result;
         }
         if (skipRetryStatuses.includes(result.status) || notVerifyPage) {
             console.log(`[${siteInfo.name}] 站点不需要二次验证或遇到拦截，跳过二次重试。`);
-            return { ...result, pending: false };
+            await keepPendingTabVisible();
+            return { ...result, pending: true, keepTabOpen: true };
         }
 
         console.log(`[${siteInfo.name}] 检测到 Pending 状态，等待页面刷新...`);
         pageBarrier = await waitUntilSignable(tab.id, notVerifyPage);
-        if (pageBarrier.status !== "ready" && pageBarrier.status !== "unknown") {
-            return { sign: false, pending: false, status: pageBarrier.status, msg: pageBarrier.msg, detail: pageBarrier.detail };
+        if (pageBarrier.status !== "ready") {
+            const pending = Boolean(pageBarrier.pending);
+            if (pending) await keepPendingTabVisible();
+            return {
+                sign: false,
+                pending,
+                keepTabOpen: pending,
+                status: pageBarrier.status,
+                msg: pageBarrier.msg,
+                detail: pageBarrier.detail,
+            };
         }
 
-        return await runSignScript(tab.id, siteInfo);
+        const retriedResult = await runSignScript(tab.id, siteInfo);
+        if (preservePendingStatuses.includes(retriedResult.status) || retriedResult.pending) {
+            await keepPendingTabVisible();
+            return {...retriedResult, pending: true, keepTabOpen: true};
+        }
+        return retriedResult;
 
     } catch (err) {
         console.error(`[${siteInfo.name} 签到流程] 异常：`, err);
         return { sign: false, pending: false, status: "task-error", msg: err?.message };
     } finally {
-        if (!debugConfig.debugSignFlow) {
+        if (!debugConfig.debugSignFlow && !keepTabOpen) {
             await closeTabSafe(tab.id);
         } else {
-            console.log(`[${siteInfo.name} 调试模式] 已保留标签页 ${tab.id}，可继续手动检查页面与控制台。`);
+            const reason = debugConfig.debugSignFlow ? "调试模式" : "待人工确认";
+            console.log(`[${siteInfo.name} ${reason}] 已保留标签页 ${tab.id}，可继续手动检查页面与控制台。`);
         }
     }
 }

@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 
 import {
     getRecordResultOnDate,
+    isBatchRetryableResult,
     isConfirmedSignResult,
     isRecordSignedOnDate,
     mergeSignRecord,
+    requiresManualConfirmation,
 } from '../src/options/utils/sign/signResult.js';
 import {getSignStrategy} from '../src/options/utils/sign/signStrategies/index.js';
 
@@ -77,4 +79,23 @@ test('today result lookup does not reuse yesterday last result', () => {
 
     assert.equal(getRecordResultOnDate(record, '2026-08-19'), null);
     assert.equal(record.lastResult.msg, '昨天签到成功');
+});
+
+test('pending or action-triggered results are never batch-retried', () => {
+    assert.equal(requiresManualConfirmation({
+        pending: true,
+        status: 'action-triggered',
+    }), true);
+    assert.equal(isBatchRetryableResult({
+        pending: true,
+        status: 'action-triggered',
+    }), false);
+    assert.equal(isBatchRetryableResult({
+        pending: false,
+        status: 'failed',
+    }), true);
+    assert.equal(isBatchRetryableResult({
+        pending: false,
+        status: 'login-required',
+    }), false);
 });

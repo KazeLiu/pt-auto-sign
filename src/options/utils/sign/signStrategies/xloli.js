@@ -38,6 +38,7 @@ export async function xloliMain() {
     const createResult = ({
         sign = false,
         pending = false,
+        status,
         title = '',
         text = '',
         msg = '',
@@ -46,6 +47,7 @@ export async function xloliMain() {
         const result = {
             sign,
             pending,
+            ...(status ? {status} : {}),
             title,
             text,
             msg: msg || title || text || (sign ? '签到成功' : '签到失败'),
@@ -80,14 +82,16 @@ export async function xloliMain() {
             return createResult({ sign: true, title: title || '签到成功', text, detail: text || full });
         }
 
-        // 已签到后再次访问，页面返回 "Captcha verification failed"，视为今日已签到
+        // 该文案也可能来自首次提交失败，缺少服务端成功证据时不得记为已签到。
         if (/captcha\s*verification\s*failed/i.test(full)) {
-            log('[xloli] 检测到验证失效，判定为今日已签到');
+            log('[xloli] 检测到验证失败，但无法确认是否已签到');
             return createResult({
-                sign: true,
-                title: '今日已签到',
+                sign: false,
+                pending: true,
+                status: 'ambiguous-result',
+                title: '签到结果待确认',
                 text,
-                msg: '今日已签到（验证已失效）',
+                msg: '验证码验证失败，无法确认今日签到状态',
                 detail: text || full,
             });
         }

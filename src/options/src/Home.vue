@@ -150,7 +150,7 @@ import {ElLoading, ElMessage} from "element-plus";
 import {VideoPlay, Refresh, InfoFilled, List, Check, Timer, Select, CloseBold, Link} from "@element-plus/icons-vue";
 import {handleSignTask} from "../utils/sign/index.js";
 import {getSignRecords, updateSignResult} from "../utils/storage/signDate.js";
-import {isRecordSignedOnDate, getRecordResultOnDate} from "../utils/sign/signResult.js";
+import {isBatchRetryableResult, isRecordSignedOnDate, getRecordResultOnDate} from "../utils/sign/signResult.js";
 import {storage} from "../utils/storage";
 import {sendIyuuNotice} from "../utils/iyuu/index.js";
 import {getSiteData} from "../utils/storage/siteData.js";
@@ -169,6 +169,9 @@ const STATUS_REMARKS = {
   "site-unreachable": "无法访问站点或页面加载失败",
   "site-error": "站点返回错误页面",
   "cloudflare-timeout": "Cloudflare 超时或防护异常",
+  "challenge-required": "需要在保留的页面中完成人工验证",
+  "page-indeterminate": "页面状态不明确，已保留页面",
+  "ambiguous-result": "签到结果不明确，已保留页面",
   "invalid-site-url": "签到地址格式不正确",
   "strategy-missing": "未配置签到策略",
   "script-error": "页面脚本执行失败",
@@ -396,10 +399,6 @@ const signModel = reactive({
           .map(site => resultMap.get(site.name))
           .filter(Boolean);
 
-        const nonRetryStatuses = new Set([
-          "login-required", "login-captcha", "login-2fa", "secondary-auth",
-          "action-triggered", "assumed-signed"
-        ]);
         const failedSites = [];
         for (const {site, res, background} of currentPassResults) {
           const suffix = background ? " (并发)" : "";
@@ -409,8 +408,7 @@ const signModel = reactive({
             continue;
           }
 
-          const status = res.result?.status ?? "";
-          if (nonRetryStatuses.has(status)) {
+          if (!isBatchRetryableResult(res.result)) {
             if (!terminalFailures.some(item => item.name === site.name)) {
               terminalFailures.push(site);
             }

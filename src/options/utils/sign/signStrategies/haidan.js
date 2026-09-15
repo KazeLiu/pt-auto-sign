@@ -12,7 +12,8 @@ export function haidanMain() {
         };
     }
 
-    if (modalBtn.value === '已经打卡') {
+    const buttonText = String(modalBtn.value || modalBtn.innerText || '').replace(/\s+/g, ' ').trim();
+    if (/(?:已经|已經|今日已)(?:打卡|签到|簽到)/.test(buttonText)) {
         return {
             sign: true,
             pending: false,
@@ -47,7 +48,7 @@ export function haidanMain() {
     });
 
     function getSignInfo(innerText) {
-        if (innerText.includes('每日打卡')) {
+        if (/(?:签到|簽到|打卡).{0,8}(?:成功|完成)|(?:今日|今天).{0,6}已.{0,4}(?:签到|簽到|打卡)/.test(innerText)) {
             return {
                 sign: true,
                 pending: false,

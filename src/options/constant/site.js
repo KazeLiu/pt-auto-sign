@@ -9,6 +9,7 @@ export const SITE_TYPES = Object.freeze({
     PTT: 'PTT',
     PTER: "PTER",
     ROUSI: "ROUSI",
+    PIGGO: 'PIGGO',
     SSD: "SSD",
     ONLINE: 'online',
     XLOLI: 'XLOLI',
@@ -36,6 +37,11 @@ export const SITE_LIST = [
         name: 'SSD',
         siteType: SITE_TYPES.SSD,
         site: "https://springsunday.net/",
+    },
+    {
+        name: '猪猪',
+        siteType: SITE_TYPES.PIGGO,
+        site: 'https://piggo.me/calendar',
     },
 
     // --- Online 类型站点 ---

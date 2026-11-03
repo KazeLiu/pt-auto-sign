@@ -10,6 +10,7 @@ import {PterMain} from "./PTer.js";
 import {RousiMain} from "./Rousi.js";
 import {ssdMain} from "./ssd.js";
 import {xloliMain} from "./xloli.js";
+import {piggoMain} from "./piggo.js";
 
 const STRATEGY_MAP = {
     HANHAN: hanhanMain,
@@ -20,6 +21,7 @@ const STRATEGY_MAP = {
     PTT: pttMain,
     PTER: PterMain,
     ROUSI: RousiMain,
+    PIGGO: piggoMain,
     SSD: ssdMain,
     XLOLI: xloliMain,
     online: onlineMian,

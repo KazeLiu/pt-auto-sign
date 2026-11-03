@@ -29,6 +29,9 @@
     "activeTab",
     "storage"
   ],
+  "optional_permissions": [
+    "cookies"
+  ],
   "host_permissions": [
     "https://*/*",
     "http://*/*"

@@ -1,12 +1,12 @@
 <template>
   <!-- 顶部卡片 -->
-  <div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex justify-between items-center transition hover:shadow-md">
+  <div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex flex-wrap gap-4 justify-between items-center transition hover:shadow-md">
     <div>
       <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
         站点设置
       </h1>
     </div>
-    <div class="flex gap-3 items-center">
+    <div class="flex flex-wrap gap-3 items-center">
       <input type="file" ref="fileInput" class="hidden" accept=".json" @change="actions.handleFileImport">
       <el-tooltip placement="top" effect="light">
         <template #content>
@@ -41,6 +41,8 @@
         <el-button :icon="Upload" @click="actions.triggerImport" plain>导入配置 JSON</el-button>
         <el-button :icon="Download" @click="actions.exportData" plain>导出配置 JSON</el-button>
       </el-button-group>
+      <el-button :icon="Download" :disabled="appState.loading || appState.saving || !appState.list.length"
+                 @click="actions.openCookieExport" plain>导出 PT Cookies</el-button>
       <el-button :icon="Plus" type="primary" @click="actions.openAddDialog" plain>添加新站点</el-button>
     </div>
   </div>
@@ -111,6 +113,43 @@
       </template>
     </el-table>
   </el-card>
+
+  <el-dialog
+      v-model="cookieExportState.visible"
+      title="导出 PT Cookies"
+      width="min(560px, 92vw)"
+      :close-on-click-modal="!cookieExportState.exporting"
+      :close-on-press-escape="!cookieExportState.exporting"
+      :show-close="!cookieExportState.exporting"
+  >
+    <div class="space-y-4">
+      <p class="text-gray-700 leading-6">
+        导出当前配置的全部 {{ appState.list.length }} 个站点（含停用站点）的 Cookies，合并为一个 JSON 文件。
+        首次导出需授权读取 Cookies，文件仅在本地生成，不会上传。
+      </p>
+      <el-alert title="文件包含登录凭据，仅交给可信工具导入；请勿公开或提交到代码仓库。"
+                type="warning" :closable="false" show-icon/>
+      <el-alert v-if="cookieExportState.error" :title="cookieExportState.error"
+                type="error" :closable="false" show-icon/>
+      <div v-if="cookieExportState.result" class="space-y-2" role="status" aria-live="polite">
+        <p v-if="cookieExportState.result.fileName" class="text-gray-700 leading-6 break-all">
+          已发起下载：{{ cookieExportState.result.fileName }}
+          （{{ cookieExportState.result.siteCount }} 个站点，{{ cookieExportState.result.cookieCount }} 条 Cookies）。
+        </p>
+        <p v-else class="text-gray-700 leading-6">没有读取到可导出的 Cookies，未生成文件。</p>
+        <p v-if="cookieExportState.result.emptySites.length" class="text-gray-700 leading-6 break-words">
+          未读取到 Cookies：{{ cookieExportState.result.emptySites.join('、') }}。
+          请在当前浏览器中登录，并确认插件已获准访问这些站点后重新导出。
+        </p>
+      </div>
+    </div>
+    <template #footer>
+      <el-button :disabled="cookieExportState.exporting" @click="cookieExportState.visible = false">关闭</el-button>
+      <el-button type="primary" :loading="cookieExportState.exporting" @click="actions.exportCookies">
+        {{ cookieExportState.result ? '重新导出 JSON' : '导出 JSON' }}
+      </el-button>
+    </template>
+  </el-dialog>
 
   <!-- 编辑/新增 弹窗 -->
   <el-dialog
@@ -258,7 +297,9 @@ import {getSiteData, setSiteData} from "../utils/storage/siteData.js";
 import {SITE_LIST, SITE_TYPES} from "../constant/site.js";
 import {ElMessage, ElMessageBox} from "element-plus";
 import {openInNewTab} from "../utils/index.js";
+import {collectSiteCookies} from "../utils/cookieExport.js";
 import {Delete, Edit, Download, Upload, Plus} from '@element-plus/icons-vue'
+import browser from "webextension-polyfill";
 
 const fileInput = ref(null);
 
@@ -266,6 +307,13 @@ const appState = reactive({
   list: [],
   loading: false,
   saving: false
+});
+
+const cookieExportState = reactive({
+  visible: false,
+  exporting: false,
+  result: null,
+  error: ''
 });
 
 const dialogState = reactive({
@@ -283,6 +331,18 @@ const formModel = reactive({
   active: false,
   notVerifyPage: false
 });
+
+const downloadJson = (data, fileName) => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 
 const actions = {
   // 初始化数据
@@ -396,19 +456,37 @@ const actions = {
 
   // 导出 JSON
   exportData: () => {
-    const dataStr = JSON.stringify(appState.list, null, 2);
-    const blob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    console.log(`[站点列表] 站点导出成功 ${appState.list.length} 个`, dataStr)
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `site_config_${new Date().getTime()}.json`;
-    document.body.appendChild(a);
-    a.click();
-
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadJson(appState.list, `site_config_${new Date().getTime()}.json`);
     ElMessage.success('配置导出完成');
+  },
+
+  openCookieExport: () => {
+    cookieExportState.result = null;
+    cookieExportState.error = '';
+    cookieExportState.visible = true;
+  },
+
+  exportCookies: async () => {
+    if (cookieExportState.exporting) return;
+    cookieExportState.exporting = true;
+    cookieExportState.result = null;
+    cookieExportState.error = '';
+    try {
+      // 直接由按钮点击申请权限，避免异步确认弹窗丢失用户手势。
+      const granted = await browser.permissions.request({permissions: ['cookies']});
+      if (!granted) {
+        cookieExportState.error = '未获得 Cookie 读取权限，未生成文件。可再次点击导出并授权。';
+        return;
+      }
+      const {cookies, emptySites, siteCount} = await collectSiteCookies(appState.list);
+      const fileName = cookies.length ? `pt_cookies_${Date.now()}.json` : '';
+      if (fileName) downloadJson(cookies, fileName);
+      cookieExportState.result = {fileName, cookieCount: cookies.length, siteCount, emptySites};
+    } catch (error) {
+      cookieExportState.error = `导出失败：${error.message}。请确认扩展已重新加载，并获准访问站点后重试。`;
+    } finally {
+      cookieExportState.exporting = false;
+    }
   },
 
   triggerImport: () => {

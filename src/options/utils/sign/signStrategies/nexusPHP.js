@@ -50,6 +50,12 @@ export async function nexusPHP() {
                 return true; // 没有弹窗或已关闭
             }
 
+            const modalText = normalizeText(modal.innerText ?? modal.textContent ?? '');
+            if (!/(?:签到|簽到|打卡|公告|今天|今日|attendance|confirm)/i.test(modalText)) {
+                log('[nexusPHP] 检测到与签到无关的弹窗，停止自动点击');
+                return false;
+            }
+
             // 查找 layui 弹窗的确认按钮
             const button = modal.querySelector('.layui-layer-btn0');
             if (!button || window.getComputedStyle(button).display === 'none') {

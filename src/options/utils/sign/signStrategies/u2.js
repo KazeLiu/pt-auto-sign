@@ -13,11 +13,36 @@
  * - detail {string}: 详细信息
  */
 export function u2Main() {
+    const actionStorageKey = 'pt-auto-sign:u2-action-started-at';
+    const getLastActionAt = () => {
+        try {
+            return Number(window.sessionStorage?.getItem(actionStorageKey)) || 0;
+        } catch {
+            return 0;
+        }
+    };
+    const rememberAction = () => {
+        try {
+            window.sessionStorage?.setItem(actionStorageKey, String(Date.now()));
+        } catch {
+            // 无法访问 sessionStorage 时仍允许本次提交。
+        }
+    };
+    const clearAction = () => {
+        try {
+            window.sessionStorage?.removeItem(actionStorageKey);
+        } catch {
+            // 忽略受限页面的存储异常。
+        }
+    };
     const signTitle = document.querySelector('td.outer table.main .embedded h2')?.innerText ?? '';
     const signText = document.querySelector('td.outer table.main .embedded table .text')?.innerText ?? '';
+    const normalizedTitle = String(signTitle).replace(/\s+/g, '').trim();
+    const normalizedText = String(signText).replace(/\s+/g, '').trim();
 
     // 已经签到成功（刷新后的状态）
-    if (signText === '感谢，今天已签到。') {
+    if (/感谢[，,]?(?:今天|今日)已签到[。.]?/.test(normalizedText)) {
+        clearAction();
         return {
             sign: true,
             pending: false,
@@ -29,12 +54,26 @@ export function u2Main() {
     }
 
     // 还在签到页，尝试提交
-    if (signTitle === '签到区') {
+    if (normalizedTitle === '签到区') {
         const textarea = document.querySelector('td.outer table.main .embedded textarea');
         const submitBtn = document.querySelector('td.outer table.main .embedded table.captcha input[type=submit]');
 
         if (textarea && submitBtn) {
+            if (Date.now() - getLastActionAt() < 60_000) {
+                return {
+                    sign: false,
+                    pending: true,
+                    status: 'action-triggered',
+                    title: signTitle,
+                    text: signText,
+                    msg: '签到请求已触发，等待页面确认',
+                    detail: signText
+                };
+            }
             textarea.value = '59个UCoin';
+            textarea.dispatchEvent(new Event('input', {bubbles: true}));
+            textarea.dispatchEvent(new Event('change', {bubbles: true}));
+            rememberAction();
             submitBtn.click();
 
             return {

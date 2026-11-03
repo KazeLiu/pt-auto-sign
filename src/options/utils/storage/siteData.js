@@ -1,4 +1,5 @@
 import {storage} from './index';
+import {validateSiteList} from './siteValidation.js';
 
 const STORAGE_KEY = 'site_data';
 
@@ -18,8 +19,11 @@ export async function getSiteData() {
  * @returns {Promise<void>}
  */
 export async function setSiteData(value) {
+    validateSiteList(value);
     await storage.set(STORAGE_KEY, value);
 }
+
+export {validateSiteList};
 
 /**
  * 根据站点名称移除站点配置。

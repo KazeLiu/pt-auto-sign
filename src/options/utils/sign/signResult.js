@@ -2,6 +2,31 @@ import {getDateString} from "../index.js";
 
 export const ACTION_TRIGGERED_STATUS = "action-triggered";
 export const ASSUMED_SIGNED_STATUS = "assumed-signed";
+export const MANUAL_CONFIRMATION_STATUSES = Object.freeze([
+    ACTION_TRIGGERED_STATUS,
+    ASSUMED_SIGNED_STATUS,
+    "ambiguous-result",
+    "challenge-required",
+    "page-barrier",
+    "page-indeterminate",
+]);
+
+const MANUAL_CONFIRMATION_STATUS_SET = new Set(MANUAL_CONFIRMATION_STATUSES);
+const NON_RETRYABLE_STATUSES = new Set([
+    ...MANUAL_CONFIRMATION_STATUSES,
+    "login-required",
+    "login-captcha",
+    "login-2fa",
+    "secondary-auth",
+]);
+
+export function requiresManualConfirmation(result = {}) {
+    return Boolean(result?.pending) || MANUAL_CONFIRMATION_STATUS_SET.has(result?.status);
+}
+
+export function isBatchRetryableResult(result = {}) {
+    return !result?.pending && !NON_RETRYABLE_STATUSES.has(result?.status);
+}
 
 function getDailyResults(record) {
     if (!record?.dailyResults || typeof record.dailyResults !== "object" || Array.isArray(record.dailyResults)) {

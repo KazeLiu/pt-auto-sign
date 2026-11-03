@@ -2,9 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+    getRecordResultOnDate,
+    isBatchRetryableResult,
     isConfirmedSignResult,
     isRecordSignedOnDate,
     mergeSignRecord,
+    requiresManualConfirmation,
 } from '../src/options/utils/sign/signResult.js';
 import {getSignStrategy} from '../src/options/utils/sign/signStrategies/index.js';
 
@@ -64,4 +67,35 @@ test('failed retry does not make the current day look successful', () => {
 
     assert.equal(isRecordSignedOnDate(next, '2026-08-18'), false);
     assert.deepEqual(next.dates, ['2026-08-18']);
+});
+
+test('today result lookup does not reuse yesterday last result', () => {
+    const record = mergeSignRecord(null, 'demo', {
+        sign: true,
+        pending: false,
+        status: 'signed',
+        msg: '昨天签到成功',
+    }, '2026-08-18');
+
+    assert.equal(getRecordResultOnDate(record, '2026-08-19'), null);
+    assert.equal(record.lastResult.msg, '昨天签到成功');
+});
+
+test('pending or action-triggered results are never batch-retried', () => {
+    assert.equal(requiresManualConfirmation({
+        pending: true,
+        status: 'action-triggered',
+    }), true);
+    assert.equal(isBatchRetryableResult({
+        pending: true,
+        status: 'action-triggered',
+    }), false);
+    assert.equal(isBatchRetryableResult({
+        pending: false,
+        status: 'failed',
+    }), true);
+    assert.equal(isBatchRetryableResult({
+        pending: false,
+        status: 'login-required',
+    }), false);
 });

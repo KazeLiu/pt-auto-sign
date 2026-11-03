@@ -152,7 +152,7 @@ import {handleSignTask} from "../utils/sign/index.js";
 import {getSignRecords, updateSignResult} from "../utils/storage/signDate.js";
 import {isRecordSignedOnDate, getRecordResultOnDate} from "../utils/sign/signResult.js";
 import {storage} from "../utils/storage";
-import {sendIyuuNotice} from "../utils/iyuu/index.js";
+import {sendPushNotice} from "../utils/push/index.js";
 import {getSiteData} from "../utils/storage/siteData.js";
 import {getSettingData} from "../utils/storage/settingData.js";
 import {getDateString, sleep} from "../utils/index.js";
@@ -297,6 +297,13 @@ const tableModel = reactive({
   }
 });
 
+async function notifySignResult(title, description) {
+  const result = await sendPushNotice(title, description);
+  if (!result.ok) {
+    ElMessage.warning(`签到结果已保存，${result.message}`);
+  }
+}
+
 // 签到块
 const signModel = reactive({
   isBatchSigning: false,
@@ -312,8 +319,8 @@ const signModel = reactive({
       const {success, msg} = await signModel.doSignLogic(site);
       await tableModel.fetchRecords();
       if (success) {
-        await sendIyuuNotice(`${site.name} 签到结果`, msg);
         ElMessage.success(`${msg}！`);
+        await notifySignResult(`${site.name} 签到结果`, msg);
         return;
       }
 
@@ -431,9 +438,9 @@ const signModel = reactive({
       ]).values()];
       batchCompleted = unresolvedSites.length === 0;
 
-      await sendIyuuNotice("批量签到结果", reportList.join("\n"));
       await tableModel.fetchRecords();
       tableModel.autoSelectUnsigned();
+      await notifySignResult("批量签到结果", reportList.join("\n"));
 
       if (batchCompleted) {
         ElMessage.success("批量任务全部执行完毕哟！✨");

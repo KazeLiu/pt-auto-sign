@@ -6,8 +6,12 @@ export const DEFAULT_SETTINGS = {
     allOpen: false,
     autoSign: false,
     autoSignTime: '00:00',
+    pushProvider: 'iyuu',
     openIyuuPush: false,
     iyuuId: '',
+    openTelegramPush: false,
+    telegramBotToken: '',
+    telegramChatId: '',
     debugSignFlow: false,
     debugPauseMs: 15000,
 };

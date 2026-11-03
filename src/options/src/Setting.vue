@@ -7,42 +7,58 @@
       </h1>
     </div>
 
-    <!-- IYUU 推送 -->
+    <!-- 消息推送 -->
     <el-card shadow="hover" class="rounded-xl border-none">
       <template #header>
         <div class="card-header flex justify-between items-center">
-          <span>IYUU 推送</span>
+          <span>消息推送</span>
         </div>
       </template>
 
       <div class="space-y-4">
-        <el-input
-            v-model="setting.iyuuId"
-            placeholder="请输入 IYUU ID"
-            clearable
-        >
-          <template #append>
-            <el-button :icon="Select" @click="saveSetting"/>
-          </template>
-        </el-input>
+        <el-form label-position="top" :disabled="testingPush || !settingsLoaded">
+          <el-form-item label="推送渠道">
+            <el-radio-group v-model="setting.pushProvider" @change="changePushProvider">
+              <el-radio-button value="iyuu">IYUU（微信）</el-radio-button>
+              <el-radio-button value="telegram">Telegram</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
 
-        <div class="flex justify-between items-center text-sm text-gray-400">
-          <span>
-            <el-switch v-model="setting.openIyuuPush" @change="saveSetting" active-text="启用" inactive-text="禁用" inline-prompt/>
-          </span>
-          <div class="space-x-2">
-            <el-button size="small" @click="openInNewTab('https://iyuu.cn/')">
-              申请 ID
-            </el-button>
-            <el-button
-                size="small"
-                type="primary"
-                plain
-                @click="sendIyuuNotice('推送测试','如果收到这条推送，那表示你订阅成功')"
-            >
-              测试推送
-            </el-button>
+          <template v-if="setting.pushProvider === 'telegram'">
+            <el-form-item label="Bot Token">
+              <el-input v-model="setting.telegramBotToken" type="password" show-password clearable autocomplete="off"
+                        placeholder="从 @BotFather 获取" @input="clearPushResult"/>
+            </el-form-item>
+            <el-form-item label="Chat ID">
+              <el-input v-model="setting.telegramChatId" clearable placeholder="个人或群组的数字 ID，也支持 @频道用户名"
+                        @input="clearPushResult"/>
+            </el-form-item>
+            <p class="text-sm text-gray-600 leading-6 mb-4">
+              在 @BotFather 创建机器人，先在目标会话向机器人发送 /start，再填写 Token 和 Chat ID。
+              群组需先加入机器人，频道需授予发送权限。浏览器网络须能访问 api.telegram.org。
+            </p>
+          </template>
+          <template v-else>
+            <el-form-item label="IYUU Token（ID）">
+              <el-input v-model="setting.iyuuId" type="password" show-password clearable autocomplete="off"
+                        placeholder="填写 IYUU 绑定后获得的 Token" @input="clearPushResult"/>
+            </el-form-item>
+          </template>
+
+          <el-form-item label="自动推送签到结果">
+            <el-switch v-model="pushEnabled" @change="saveSetting" active-text="启用" inactive-text="禁用" inline-prompt/>
+            <span class="text-gray-600 text-sm ml-3">只向所选渠道推送，批量签到发送一份汇总</span>
+          </el-form-item>
+          <div class="flex flex-wrap gap-2">
+            <el-button v-if="setting.pushProvider === 'iyuu'" @click="openInNewTab('https://iyuu.cn/')">申请 Token</el-button>
+            <el-button v-else @click="openInNewTab('https://t.me/BotFather')">打开 BotFather</el-button>
+            <el-button @click="saveSetting">保存配置</el-button>
+            <el-button type="primary" :loading="testingPush" @click="testPush">测试推送</el-button>
           </div>
+          <p class="text-gray-600 text-sm mt-3">测试会保存并使用当前填写的配置，即使自动推送关闭也会发送一条测试消息。</p>
+        </el-form>
+        <div v-if="pushResult" aria-live="polite">
+          <el-alert :title="pushResult.message" :type="pushResult.ok ? 'success' : 'error'" :closable="false" show-icon/>
         </div>
       </div>
     </el-card>
@@ -144,18 +160,50 @@
 </template>
 
 <script setup>
-import {onMounted, ref} from "vue";
+import {computed, onMounted, ref} from "vue";
 import {ElMessage} from "element-plus";
-import {Select} from '@element-plus/icons-vue';
 
 import {openInNewTab} from "../utils/index.js";
-import {sendIyuuNotice} from "../utils/iyuu/index.js";
-import {getSettingData, setSettingData} from "../utils/storage/settingData.js";
+import {sendPushNotice} from "../utils/push/index.js";
+import {DEFAULT_SETTINGS, getSettingData, setSettingData} from "../utils/storage/settingData.js";
 
-const setting = ref({});
+const setting = ref({...DEFAULT_SETTINGS});
+const settingsLoaded = ref(false);
+const testingPush = ref(false);
+const pushResult = ref(null);
+const pushEnabled = computed({
+  get: () => setting.value.pushProvider === 'telegram' ? setting.value.openTelegramPush : setting.value.openIyuuPush,
+  set: value => {
+    const key = setting.value.pushProvider === 'telegram' ? 'openTelegramPush' : 'openIyuuPush';
+    setting.value[key] = value;
+  },
+});
 const saveSetting = async () => {
-  await setSettingData(setting.value);
-  ElMessage.success('保存成功');
+  try {
+    await setSettingData(setting.value);
+    ElMessage.success('保存成功');
+  } catch {
+    ElMessage.error('设置保存失败，请重试');
+  }
+};
+const clearPushResult = () => {pushResult.value = null;};
+const changePushProvider = async () => {
+  clearPushResult();
+  await saveSetting();
+};
+const testPush = async () => {
+  if (testingPush.value || !settingsLoaded.value) return;
+  testingPush.value = true;
+  clearPushResult();
+  try {
+    const settings = {...setting.value};
+    await setSettingData(settings);
+    pushResult.value = await sendPushNotice('PT 签到小助手 · 推送测试', '收到这条消息表示推送配置可用。', {settings, force: true});
+  } catch {
+    pushResult.value = {ok: false, message: '设置保存失败，未发送测试消息，请重试'};
+  } finally {
+    testingPush.value = false;
+  }
 };
 
 const timeOptions = [
@@ -187,6 +235,7 @@ const timeOptions = [
 
 onMounted(async () => {
   setting.value = await getSettingData();
+  settingsLoaded.value = true;
 });
 </script>
 

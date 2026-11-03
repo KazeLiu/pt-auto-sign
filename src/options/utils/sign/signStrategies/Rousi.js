@@ -1,72 +1,62 @@
-export function RousiMain() {
-    const createResult = ({
-        sign = false,
-        pending = false,
-        title = '',
-        text = '',
-        msg = '',
-        detail = '',
-    } = {}) => ({
-        sign,
-        pending,
-        title,
-        text,
-        msg: msg || title || text || (sign ? '签到成功' : '签到失败'),
-        detail: detail || text,
+export async function RousiMain() {
+    const normalizeText = node => String(node?.innerText ?? node?.textContent ?? '')
+        .replace(/\s+/g, ' ').trim();
+    const guardKey = 'ptAutoSignRousiTriggered';
+    const page = document.documentElement;
+    let deadline = Date.now() + 15000;
+    const unconfirmed = detail => ({
+        sign: false,
+        pending: true,
+        status: 'action-triggered',
+        title: 'Rousi 签到结果待确认',
+        text: normalizeText(document.querySelector('header button[title^="快捷签到"]')),
+        msg: '已触发 Rousi 签到，待确认',
+        detail,
     });
 
-    const checkedInBtn = document.querySelector('button[title^="已签到"]');
-    if (checkedInBtn) {
-        return createResult({
-            sign: true,
-            title: '已经打卡',
-            text: checkedInBtn.title || checkedInBtn.innerText || '',
-        });
-    }
-
-    const signInBtn = document.querySelector('button[title^="签到"]');
-    if (signInBtn) {
-        signInBtn.click();
-    }
-
-    return new Promise((resolve) => {
-        const maxTime = 15000; // 最多等15秒，防止死循环
-        let spentTime = 0;
-
-        const intervalId = setInterval(() => {
-            spentTime += 500;
-
-            // 注意：Tailwind 类名中的方括号 [ ] 在 querySelector 中需要用 \ 转义
-            const titleEl = document.querySelector('.fixed.z-\\[200\\] span.text-sm.font-medium');
-            const contentEl = document.querySelector('.fixed.z-\\[200\\] div.text-xs.opacity-90');
-
-            if (titleEl) {
-                const title = titleEl.innerText || '';
-                const content = contentEl ? contentEl.innerText : '';
-
-                const result = getSignInfo(title, content);
-                if (result.sign) {
-                    clearInterval(intervalId);
-                    resolve(result);
-                    return;
-                }
-            }
-
-            if (spentTime >= maxTime) {
-                clearInterval(intervalId);
-                resolve(createResult({msg: '签到弹窗等待超时'}));
-            }
-        }, 500);
-    });
-
-    function getSignInfo(title, content) {
-        if (title.includes('签到成功')) {
-            return createResult({
+    while (Date.now() < deadline) {
+        // 新版成功后将快捷签到按钮替换为已签到链接，不再使用旧版弹窗。
+        const signedLink = document.querySelector('header a[role="button"][href="/account/economy"]');
+        const text = normalizeText(signedLink);
+        if (/^已签到(?:\s|$)/.test(text)) {
+            return {
                 sign: true,
-                title: '签到成功',
-                text: content || title,
-            });
+                pending: false,
+                status: 'signed',
+                title: 'Rousi 今日已签到',
+                text,
+                msg: text,
+                detail: text,
+            };
         }
-        return createResult({sign: false});
+
+        const signButton = document.querySelector('header button[title^="快捷签到"]');
+        if (page.dataset[guardKey] !== 'true' && !signButton?.disabled
+            && normalizeText(signButton) === '签到') {
+            // 标记留在文档中，策略重注入也不重复提交固定奖励签到。
+            page.dataset[guardKey] = 'true';
+            deadline = Date.now() + 15000;
+            try {
+                signButton.click();
+            } catch {
+                return unconfirmed('触发 Rousi 签到时发生异常，未再次点击；请到站点确认结果');
+            }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 250));
     }
+
+    if (page.dataset[guardKey] === 'true') {
+        return unconfirmed('等待 Rousi 已签到状态超过 15 秒，未再次点击；请到站点确认结果');
+    }
+
+    return {
+        sign: false,
+        pending: false,
+        status: 'failed',
+        title: '未识别到 Rousi 签到入口',
+        text: '',
+        msg: '未识别到 Rousi 签到入口，请确认已登录 https://rousi.pro/',
+        detail: '',
+    };
 }

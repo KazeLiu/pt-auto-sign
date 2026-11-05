@@ -169,7 +169,7 @@ const STATUS_REMARKS = {
   "site-unreachable": "无法访问站点或页面加载失败",
   "site-error": "站点返回错误页面",
   "cloudflare-timeout": "Cloudflare 超时或防护异常",
-  "challenge-required": "需要在保留的页面中完成人工验证",
+  "challenge-required": "安全验证未通过",
   "page-indeterminate": "页面状态不明确，已保留页面",
   "ambiguous-result": "签到结果不明确，已保留页面",
   "invalid-site-url": "签到地址格式不正确",

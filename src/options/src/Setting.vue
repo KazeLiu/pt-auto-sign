@@ -80,6 +80,13 @@
             </span>
           </div>
         </el-form-item>
+        <el-form-item label="验证超时后保留页面">
+          <div class="flex items-center gap-3">
+            <el-switch v-model="setting.keepVerificationPageOnTimeout" :disabled="!settingsLoaded"
+                       @change="saveSetting" active-text="启用" inactive-text="禁用" inline-prompt/>
+            <span class="text-gray-400 text-sm">开启后，安全验证等待超时的签到页会留下供手动处理</span>
+          </div>
+        </el-form-item>
       </el-form>
     </el-card>
 

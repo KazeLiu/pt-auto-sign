@@ -253,7 +253,7 @@ async function waitForVerifyPage(tabId, timeout = VERIFY_TIMEOUT) {
             await sleep(VERIFY_POLL_INTERVAL);
         }
     }
-    console.warn(`[Tab ${tabId}] 等待盾消失超时 (${timeout}ms)，转为人工处理`);
+    console.warn(`[Tab ${tabId}] 等待盾消失超时 (${timeout}ms)`);
     return false;
 }
 
@@ -529,7 +529,7 @@ async function runSignScript(tabId, siteInfo) {
 /**
  * 在执行签到前等待页面可交互，并视配置等待验证盾通过后再识别页面拦截态。
  */
-async function waitUntilSignable(tabId, skipVerifyPage) {
+async function waitUntilSignable(tabId, skipVerifyPage, keepVerificationPageOnTimeout) {
     const pageReady = await waitForPageInteractive(tabId);
     if (!pageReady) {
         const siteError = normalizePageStatusResult(
@@ -558,6 +558,19 @@ async function waitUntilSignable(tabId, skipVerifyPage) {
     const verifyPassed = skipVerifyPage ? true : await waitForVerifyPage(tabId);
 
     const postVerifySiteError = normalizePageStatusResult(await detectSiteError(tabId, skipVerifyPage), "页面错误检测返回空结果");
+    if (isBlockedPageStatus(postVerifySiteError)) return postVerifySiteError;
+
+    if (!verifyPassed) {
+        return {
+            status: "challenge-required",
+            pending: keepVerificationPageOnTimeout,
+            msg: keepVerificationPageOnTimeout
+                ? "安全验证未自动完成，请在保留的页面中人工处理"
+                : "等待安全验证通过超时，未继续签到",
+            detail: postVerifySiteError.detail || await getPagePreview(tabId),
+        };
+    }
+
     if (postVerifySiteError.status === "unknown") {
         return {
             status: "page-indeterminate",
@@ -566,17 +579,6 @@ async function waitUntilSignable(tabId, skipVerifyPage) {
             detail: postVerifySiteError.detail,
         };
     }
-    if (isBlockedPageStatus(postVerifySiteError)) return postVerifySiteError;
-
-    if (!verifyPassed) {
-        return {
-            status: "challenge-required",
-            pending: true,
-            msg: "安全验证未自动完成，请在保留的页面中人工处理",
-            detail: await getPagePreview(tabId)
-        };
-    }
-
     return waitForPageBarrier(tabId);
 }
 
@@ -584,11 +586,11 @@ async function waitUntilSignable(tabId, skipVerifyPage) {
  * 执行单个站点的完整签到任务。
  */
 export async function handleSignTask(siteInfo) {
-    const debugConfig = await getDebugConfig();
+    const {debugSignFlow, keepVerificationPageOnTimeout} = await getSettingData();
     // xloli 等内嵌 Cloudflare Turnstile 的签到页，widget 会被 waitForVerifyPage 误判为常驻安全盾，
     // 需强制跳过验证等待，避免误判超时导致签到失败。
     const notVerifyPage = siteInfo.notVerifyPage || siteInfo.siteType === SITE_TYPES.XLOLI;
-    const tabOptions = siteInfo.active || debugConfig.debugSignFlow ? { active: true } : { active: false, pinned: true };
+    const tabOptions = siteInfo.active || debugSignFlow ? { active: true } : { active: false, pinned: true };
     let targetUrl;
     try {
         targetUrl = normalizeTargetUrl(siteInfo.site);
@@ -617,7 +619,7 @@ export async function handleSignTask(siteInfo) {
         console.log(`[${siteInfo.name} 签到流程] 开始 ${siteInfo.name}`);
 
         // 阶段一：等待并校验可签到状态
-        let pageBarrier = await waitUntilSignable(tab.id, notVerifyPage);
+        let pageBarrier = await waitUntilSignable(tab.id, notVerifyPage, keepVerificationPageOnTimeout);
         if (pageBarrier.status !== "ready") {
             const pending = Boolean(pageBarrier.pending);
             if (pending) await keepPendingTabVisible();
@@ -654,7 +656,7 @@ export async function handleSignTask(siteInfo) {
         }
 
         console.log(`[${siteInfo.name}] 检测到 Pending 状态，等待页面刷新...`);
-        pageBarrier = await waitUntilSignable(tab.id, notVerifyPage);
+        pageBarrier = await waitUntilSignable(tab.id, notVerifyPage, keepVerificationPageOnTimeout);
         if (pageBarrier.status !== "ready") {
             const pending = Boolean(pageBarrier.pending);
             if (pending) await keepPendingTabVisible();
@@ -679,10 +681,10 @@ export async function handleSignTask(siteInfo) {
         console.error(`[${siteInfo.name} 签到流程] 异常：`, err);
         return { sign: false, pending: false, status: "task-error", msg: err?.message };
     } finally {
-        if (!debugConfig.debugSignFlow && !keepTabOpen) {
+        if (!debugSignFlow && !keepTabOpen) {
             await closeTabSafe(tab.id);
         } else {
-            const reason = debugConfig.debugSignFlow ? "调试模式" : "待人工确认";
+            const reason = debugSignFlow ? "调试模式" : "待人工确认";
             console.log(`[${siteInfo.name} ${reason}] 已保留标签页 ${tab.id}，可继续手动检查页面与控制台。`);
         }
     }

@@ -4,6 +4,7 @@ export const SETTINGS_KEY = 'settings';
 
 export const DEFAULT_SETTINGS = {
     allOpen: false,
+    keepVerificationPageOnTimeout: false,
     autoSign: false,
     autoSignTime: '00:00',
     pushProvider: 'iyuu',
